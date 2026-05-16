@@ -126,18 +126,30 @@ if question:
     # Display sources
     with st.expander("📚 Sources"):
         for s, p in zip(sources, pages):
-            st.write(f"- {s} (page {p})")
+            st.write(f"- {s} (page {p})")'''
 
-if st.sidebar.button("Search on CAIE Finder"):
-    # Construct the search URL
-    base_url = "https://www.caiefinder.com/search"
-    # This is the pattern the site uses. If it changes, you might need to adjust.
-    full_url = f"{base_url}?q={subject_code}+{search_query.replace(' ', '+')}"
-    
-    # Show the link to the user
-    st.sidebar.markdown(f"[Open Search Results for '{subject_code} {search_query}']({full_url})", unsafe_allow_html=True)
-    # Optionally, you can also display a message in the main area
-    st.info(f"Opening CAIE Finder search for '{subject_code} {search_query}' in a new tab.")
+# ---- SIDEBAR: Past Paper Search ----
+st.sidebar.header("🔎 Search CAIE Past Papers")
+
+# Option 1: Quick search using the main question
+st.sidebar.markdown("**Quick search:** The link below the AI answer will search using your question automatically.")
+
+st.sidebar.markdown("---")
+
+# Option 2: Manual search
+st.sidebar.markdown("**Manual search:**")
+manual_query = st.sidebar.text_input("Enter topic or paper code", placeholder="e.g., 9701 digital certificate")
+
+if st.sidebar.button("Search CAIE Finder"):
+    if manual_query:
+        # Use the manual query
+        import urllib.parse
+        encoded = urllib.parse.quote(manual_query)
+        search_url = f"https://www.caiefinder.com/search?q={encoded}"
+        st.sidebar.success(f"Searching for: {manual_query}")
+        st.sidebar.markdown(f"[🔍 Open CAIE Finder Results]({search_url})")
+    else:
+        st.sidebar.warning("Please enter a search term first.")
 def handle_question_with_papers(question, contexts):
     """
     This function handles a question in two steps:
