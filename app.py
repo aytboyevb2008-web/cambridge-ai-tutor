@@ -100,19 +100,33 @@ if question:
         contexts, sources, pages = retrieve(question)
         answer = ask_groq(question, contexts)
 
-    # Display the answer using the styled box
+    # Display answer in styled box
     st.markdown(f'<div class="answer-box">{answer}</div>', unsafe_allow_html=True)
 
+    # ---- CAIE Finder Search Link ----
+    # URL-encode the question properly
+    import urllib.parse
+    encoded_question = urllib.parse.quote(question)
+    
+    # Build the search URL
+    caie_search_url = f"https://www.caiefinder.com/search?q={encoded_question}"
+    
+    # Display a clickable button that opens in a new tab
+    st.markdown(f"""
+        <div class="mark-scheme-box">
+            <h4>📋 Search CAIE Past Papers for this question</h4>
+            <p>Click below to find relevant past papers and mark schemes:</p>
+            <a href="{caie_search_url}" target="_blank" style="display: inline-block; padding: 12px 24px; background: #1f77b4; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
+                🔍 Search CAIE Finder
+            </a>
+            <p style="margin-top: 10px; font-size: 0.85rem; color: #666;">Search query: <code>{question}</code></p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Display sources
     with st.expander("📚 Sources"):
         for s, p in zip(sources, pages):
             st.write(f"- {s} (page {p})")
-    
-    # Add the footer
-    st.markdown('<p class="footer">Powered by your Cambridge notes & past papers</p>', unsafe_allow_html=True)
-# In your app.py, create a section for past papers
-st.sidebar.header("🔎 Past Paper Search")
-subject_code = st.sidebar.text_input("Enter Subject Code (e.g., 9701)", "9701")
-search_query = st.sidebar.text_input("Enter Topic or Paper Info", "digital certificate")
 
 if st.sidebar.button("Search on CAIE Finder"):
     # Construct the search URL
