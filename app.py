@@ -1,18 +1,18 @@
 import streamlit as st
+import requests
+import urllib.parse
 from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone
-import requests
 
-# ---- SETTINGS (will come from Streamlit Secrets) ----
+# ---- SETTINGS ----
 PINECONE_API_KEY = st.secrets["PINECONE_API_KEY"]
 PINECONE_INDEX_NAME = "cambridge-notes"
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-# ----------------------------------------------------
 
-# ---- PAGE CONFIGURATION (MUST be first Streamlit command) ----
+# ---- PAGE CONFIG ----
 st.set_page_config(page_title="CAIE A-Level Tutor", page_icon="🎓")
 
-# ⭐ ===== INSERT THE CUSTOM CSS HERE ===== ⭐
+# ---- CUSTOM CSS ----
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -74,22 +74,59 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-# ⭐ ===== END OF CUSTOM CSS ===== ⭐
 
-# ---- LOAD MODEL AND CONNECT TO PINECONE ----
+# ---- LOAD MODEL & CONNECT TO PINECONE ----
 @st.cache_resource
 def load_model():
     return SentenceTransformer("all-MiniLM-L6-v2")
 
 model = load_model()
-
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(PINECONE_INDEX_NAME)
 
-# ... rest of your functions (embed_query, retrieve_context, generate_answer) ...
+# ---- GROQ API ----
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# ---- STREAMLIT UI ----
-# Replace the old title with styled HTML versions
+# ---- FUNCTIONS ----
+def retrieve(query_text, top_k=15):
+    """Embed query, search Pinecone, return contexts."""
+    query_emb = model.encode(query_text).tolist()
+    results = index.query(
+        vector=query_emb,
+        top_k=top_k,
+        include_metadata=True
+    )
+    contexts = [match["metadata"]["text"] for match in results["matches"]]
+    sources = [match["metadata"]["source"] for match in results["matches"]]
+    pages = [match["metadata"].get("page", "?") for match in results["matches"]]
+    return contexts, sources, pages
+
+def ask_groq(question, contexts):
+    """Send context + question to Groq LLM."""
+    prompt = f"""You are a Cambridge A-Level tutor. Answer the student's question using ONLY the provided context.
+If the answer is not in the context, say: "I don't have this in my notes. Please check your textbook."
+Be concise and exam-focused.
+
+Context:
+{chr(10).join(contexts)}
+
+Question: {question}
+Answer:"""
+
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "llama-3.1-8b-instant",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+        "max_tokens": 600
+    }
+    resp = requests.post(GROQ_URL, headers=headers, json=data)
+    return resp.json()["choices"][0]["message"]["content"]
+
+# ---- UI ----
 st.markdown('<h1 class="main-title">🎓 Cambridge A-Level AI Tutor</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Ask anything from the syllabus. The AI answers <b>only</b> from your official notes and past papers.</p>', unsafe_allow_html=True)
 
@@ -100,18 +137,18 @@ if question:
         contexts, sources, pages = retrieve(question)
         answer = ask_groq(question, contexts)
 
-    # Display answer in styled box
+    # Display answer
     st.markdown(f'<div class="answer-box">{answer}</div>', unsafe_allow_html=True)
 
+    # Display sources
+    with st.expander("📚 Sources"):
+        for s, p in zip(sources, pages):
+            st.write(f"- {s} (page {p})")
+
     # ---- CAIE Finder Search Link ----
-    # URL-encode the question properly
-    import urllib.parse
     encoded_question = urllib.parse.quote(question)
-    
-    # Build the search URL
     caie_search_url = f"https://www.caiefinder.com/search?q={encoded_question}"
-    
-    # Display a clickable button that opens in a new tab
+
     st.markdown(f"""
         <div class="mark-scheme-box">
             <h4>📋 Search CAIE Past Papers for this question</h4>
@@ -123,57 +160,17 @@ if question:
         </div>
     """, unsafe_allow_html=True)
 
-    # Display sources
-    with st.expander("📚 Sources"):
-        for s, p in zip(sources, pages):
-            st.write(f"- {s} (page {p})")'''
+# ---- SIDEBAR: Manual Past Paper Search ----
+st.sidebar.header("🔎 Manual Past Paper Search")
+st.sidebar.markdown("Use this to search CAIE Finder directly without asking the AI first.")
 
-# ---- SIDEBAR: Past Paper Search ----
-st.sidebar.header("🔎 Search CAIE Past Papers")
-
-# Option 1: Quick search using the main question
-st.sidebar.markdown("**Quick search:** The link below the AI answer will search using your question automatically.")
-
-st.sidebar.markdown("---")
-
-# Option 2: Manual search
-st.sidebar.markdown("**Manual search:**")
 manual_query = st.sidebar.text_input("Enter topic or paper code", placeholder="e.g., 9701 digital certificate")
 
 if st.sidebar.button("Search CAIE Finder"):
     if manual_query:
-        # Use the manual query
-        import urllib.parse
         encoded = urllib.parse.quote(manual_query)
         search_url = f"https://www.caiefinder.com/search?q={encoded}"
         st.sidebar.success(f"Searching for: {manual_query}")
         st.sidebar.markdown(f"[🔍 Open CAIE Finder Results]({search_url})")
     else:
         st.sidebar.warning("Please enter a search term first.")
-def handle_question_with_papers(question, contexts):
-    """
-    This function handles a question in two steps:
-    1. Get the AI-generated answer from your notes.
-    2. Provide a direct link to find related past papers on caiefinder.com.
-    """
-    # 1. Generate the answer from your existing RAG pipeline
-    ai_answer = ask_groq(question, contexts) # This is your existing function
-    
-    # 2. Create the caiefinder search link
-    # Extract likely subject/topic from the question (you can make this smarter later)
-    # For now, a simple link using the question as the query will work
-    search_url = f"https://www.caiefinder.com/search?q={question.replace(' ', '+')}"
-    
-    # 3. Display the answer
-    st.markdown(f'<div class="answer-box">{ai_answer}</div>', unsafe_allow_html=True)
-    
-    # 4. Display the link to search for related past papers
-    st.markdown(f"""
-        <div class="mark-scheme-box">
-            <h4>📋 Want to practice past paper questions on this topic?</h4>
-            <p>Click the link below to search for relevant past papers and mark schemes:</p>
-            <a href="{search_url}" target="_blank">🔍 Search CAIE Past Papers for: {question}</a>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    return ai_answer
