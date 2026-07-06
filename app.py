@@ -255,37 +255,38 @@ if st.sidebar.button("🔍 Search CAIE Finder", use_container_width=True):
     else:
         result_placeholder.warning("Please enter a search term first.")
 if question:
-    # Cooldown check
-    elapsed = time.time() - st.session_state.last_question_time
-    remaining = COOLDOWN_SECONDS - elapsed
-    if remaining > 0:
-        st.warning(f"⏳ Please wait {remaining:.0f} seconds before asking another question.")
-        st.stop()
-
-    # Avoid duplicate API call if question is repeated (cache)
-    if question == st.session_state.last_question:
+    # ---- CACHE CHECK (before cooldown) ----
+    if question == st.session_state.get("last_question", None):
+        # Same question – serve cached answer instantly, ignore cooldown
         answer = st.session_state.last_answer
-        # don't increment counter or reset timer for same question
-        st.markdown(f'<div class="answer-box">{answer}</div>', unsafe_allow_html=True)
     else:
+        # New question – apply cooldown
+        elapsed = time.time() - st.session_state.get("last_question_time", 0)
+        remaining = COOLDOWN_SECONDS - elapsed
+        if remaining > 0:
+            # Toast notification (non‑blocking)
+            st.toast(f"⏳ Please wait {remaining:.0f} seconds before asking a new question.", icon="⏳")
+            # Stop processing the new question, but keep old answer visible
+            st.stop()
+        
+        # Process new question
         with st.spinner("Searching your notes..."):
             contexts, sources, pages = retrieve(question)
             answer = ask_groq(question, contexts, detail=detail_level, simple=simple_mode)
-
-        st.markdown(f'<div class="answer-box">{answer}</div>', unsafe_allow_html=True)
-
-        with st.expander("📚 Sources"):
-            for s, p in zip(sources, pages):
-                st.write(f"- {s} (page {p})")
-
+        
         # Save to session
         st.session_state.last_question = question
         st.session_state.last_answer = answer
         st.session_state.question_count += 1
         st.session_state.last_question_time = time.time()
 
-                      # ---- TEXT-TO-SPEECH (better voice + pause) ----
-               # ---- TEXT-TO-SPEECH (pre-load voices, debug log) ----
+    # ---- DISPLAY ANSWER (always run, even if cached) ----
+    st.markdown(f'<div class="answer-box">{answer}</div>', unsafe_allow_html=True)
+
+    with st.expander("📚 Sources"):
+        for s, p in zip(sources, pages):
+            st.write(f"- {s} (page {p})")
+                   
                 # ---- TEXT-TO-SPEECH (manual voice selector, pause) ----
         encoded = base64.b64encode(answer.encode()).decode()
         tts_html = f"""
@@ -388,32 +389,28 @@ if question:
         </script>
         """
         st.components.v1.html(tts_html, height=100)
-        # ---- TOPIC SUMMARIZER ----
-        # Initialize a session key for the summary
-        summary_key = f"summary_{question}"
-        if summary_key not in st.session_state:
-            st.session_state[summary_key] = None
+       # ---- TOPIC SUMMARIZER ----
+    summary_key = f"summary_{question}"
+    if summary_key not in st.session_state:
+        st.session_state[summary_key] = None
 
-        col_summary_btn, _ = st.columns([1, 3])
-        with col_summary_btn:
-            if st.button("📝 Summarize This Topic"):
-                # Apply cooldown before making API call
-                elapsed = time.time() - st.session_state.last_question_time
-                remaining = COOLDOWN_SECONDS - elapsed
-                if remaining > 0:
-                    st.warning(f"⏳ Cooldown active. Please wait {remaining:.0f} seconds.")
-                else:
-                    with st.spinner("Generating revision summary..."):
-                        summary = summarize_topic(question, contexts)
-                        st.session_state[summary_key] = summary
-                        # Update last_question_time to prevent spamming
-                        st.session_state.last_question_time = time.time()
+    col_summary_btn, _ = st.columns([1, 3])
+    with col_summary_btn:
+        if st.button("📝 Summarize This Topic"):
+            # Use separate cooldown for summarizer (optional, but you can keep a short one)
+            elapsed = time.time() - st.session_state.get("last_summary_time", 0)
+            if elapsed < COOLDOWN_SECONDS:
+                st.toast(f"⏳ Please wait {COOLDOWN_SECONDS - elapsed:.0f} seconds before summarizing again.", icon="⏳")
+            else:
+                with st.spinner("Generating revision summary..."):
+                    summary = summarize_topic(question, contexts)
+                    st.session_state[summary_key] = summary
+                    st.session_state.last_summary_time = time.time()
 
-        # Display the summary if it exists
-        if st.session_state[summary_key]:
-            st.markdown("---")
-            st.markdown("### 📝 Revision Summary")
-            st.markdown(f'<div class="answer-box" style="border-left: 5px solid #28a745;">{st.session_state[summary_key]}</div>', unsafe_allow_html=True)
+    if st.session_state[summary_key]:
+        st.markdown("---")
+        st.markdown("### 📝 Revision Summary")
+        st.markdown(f'<div class="answer-box" style="border-left: 5px solid #28a745;">{st.session_state[summary_key]}</div>', unsafe_allow_html=True)
 # ---- MOTIVATIONAL MESSAGES (after streak milestones) ----
 if st.session_state.question_count in [5, 10, 20, 30]:
     st.balloons()
