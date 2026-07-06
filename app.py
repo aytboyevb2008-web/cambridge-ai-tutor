@@ -58,6 +58,16 @@ st.markdown("""
         font-weight: 600;
         color: #1f77b4;
     }
+
+    .streak-badge {
+        background-color: #1f77b4;
+        color: white;
+        padding: 8px 18px;
+        border-radius: 20px;
+        font-weight: 600;
+        display: inline-block;
+        margin-bottom: 1rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -87,11 +97,22 @@ def retrieve(query_text, top_k=10):
         pages.append(match["metadata"].get("page", "?"))
     return contexts, sources, pages
 
-def ask_groq(question, contexts):
+def ask_groq(question, contexts, detail="detailed", simple=False):
+    """Generate answer with optional style controls."""
+    # Base prompt
     prompt = f"""You are a Cambridge A-Level tutor. Answer the student's question using ONLY the provided context.
 If the answer is not in the context, say: "I don't have this in my notes. Please check your textbook."
-Provide a comprehensive, detailed explanation suitable for an A‑Level student. Cover key definitions, examples, and related concepts found in the context. Use full sentences and structured paragraphs.
+"""
 
+    # Add style instructions
+    if simple:
+        prompt += "Explain this as if the student is a 10‑year‑old. Use very simple words and relatable analogies.\n"
+    elif detail == "concise":
+        prompt += "Be brief and to‑the‑point. Give a short answer in 2‑3 sentences.\n"
+    else:  # detailed
+        prompt += "Provide a comprehensive, detailed explanation suitable for an A‑Level student. Cover key definitions, examples, and related concepts found in the context. Use full sentences and structured paragraphs.\n"
+
+    prompt += f"""
 Context:
 {chr(10).join(contexts)}
 
@@ -100,24 +121,30 @@ Answer:"""
 
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     data = {
-        "model": "llama-3.1-8b-instant",   # or "mixtral-8x7b-32768" if you prefer
+        "model": "llama-3.1-8b-instant",   # or "mixtral-8x7b-32768"
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.2,
-        "max_tokens": 600
+        "max_tokens": 400 if (simple or detail == "concise") else 800
     }
     try:
         resp = requests.post(GROQ_URL, headers=headers, json=data, timeout=15)
         if resp.status_code == 200:
             return resp.json()["choices"][0]["message"]["content"]
         else:
-            # silently return error message
             return "⚠️ Sorry, the AI service is temporarily unavailable."
     except Exception:
         return "⚠️ Network error. Please try again."
 
 # ---- UI ----
+# Initialize session states
 if "last_question_time" not in st.session_state:
     st.session_state.last_question_time = 0
+if "question_count" not in st.session_state:
+    st.session_state.question_count = 0
+if "last_answer" not in st.session_state:
+    st.session_state.last_answer = ""
+if "last_question" not in st.session_state:
+    st.session_state.last_question = ""
 
 COOLDOWN_SECONDS = 15
 
@@ -125,24 +152,70 @@ COOLDOWN_SECONDS = 15
 st.markdown('<h1 class="main-title">🎓 Cambridge A-Level AI Tutor</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Ask anything from the syllabus. The AI answers <b>only</b> from your official notes and past papers.</p>', unsafe_allow_html=True)
 
+# ---- CREATIVITY CONTROLS ----
+col1, col2 = st.columns(2)
+with col1:
+    detail_level = st.radio("📝 Answer Detail", ["detailed", "concise"], horizontal=True, index=0)
+with col2:
+    simple_mode = st.toggle("🧒 Explain Like I'm 5", value=False)
+
+# Streak display
+if st.session_state.question_count > 0:
+    st.markdown(f'<span class="streak-badge">🔥 {st.session_state.question_count} questions answered this session</span>', unsafe_allow_html=True)
+
 question = st.text_input("Your question:")
 
 if question:
+    # Cooldown check
     elapsed = time.time() - st.session_state.last_question_time
     remaining = COOLDOWN_SECONDS - elapsed
     if remaining > 0:
         st.warning(f"⏳ Please wait {remaining:.0f} seconds before asking another question.")
         st.stop()
 
-    with st.spinner("Searching your notes..."):
-        contexts, sources, pages = retrieve(question)
-        answer = ask_groq(question, contexts)
+    # Avoid duplicate API call if question is repeated (cache)
+    if question == st.session_state.last_question:
+        answer = st.session_state.last_answer
+        # don't increment counter or reset timer for same question
+        st.markdown(f'<div class="answer-box">{answer}</div>', unsafe_allow_html=True)
+    else:
+        with st.spinner("Searching your notes..."):
+            contexts, sources, pages = retrieve(question)
+            answer = ask_groq(question, contexts, detail=detail_level, simple=simple_mode)
 
-    # Display answer in a nice box
-    st.markdown(f'<div class="answer-box">{answer}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="answer-box">{answer}</div>', unsafe_allow_html=True)
 
-    with st.expander("📚 Sources"):
-        for s, p in zip(sources, pages):
-            st.write(f"- {s} (page {p})")
+        with st.expander("📚 Sources"):
+            for s, p in zip(sources, pages):
+                st.write(f"- {s} (page {p})")
 
-    st.session_state.last_question_time = time.time()
+        # Save to session
+        st.session_state.last_question = question
+        st.session_state.last_answer = answer
+        st.session_state.question_count += 1
+        st.session_state.last_question_time = time.time()
+
+        # ---- TEXT-TO-SPEECH (only after a new answer) ----
+        # Escape the answer for safe embedding in JavaScript
+        safe_answer = answer.replace("`", "\\`").replace("$", "\\$")
+        tts_html = f"""
+        <button onclick="speakAnswer()" style="padding:8px 16px; background:#1f77b4; color:white; border:none; border-radius:6px; cursor:pointer; margin-top:10px;">
+            🔊 Read Aloud
+        </button>
+        <script>
+        function speakAnswer() {{
+            const msg = new SpeechSynthesisUtterance(`{safe_answer}`);
+            msg.lang = 'en-US';
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(msg);
+        }}
+        </script>
+        """
+        st.components.v1.html(tts_html, height=60)
+
+# ---- MOTIVATIONAL MESSAGES (after streak milestones) ----
+if st.session_state.question_count in [5, 10, 20, 30]:
+    st.balloons()
+    st.success(f"🎉 Amazing! You've asked {st.session_state.question_count} questions. Keep up the great work!")
+elif st.session_state.question_count > 0 and st.session_state.question_count % 10 == 0:
+    st.info(f"💪 {st.session_state.question_count} questions – you're on fire!")
