@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-import urllib.parse
+import time
 from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone
 
@@ -59,15 +59,6 @@ st.markdown("""
         color: #1f77b4;
     }
 
-    .mark-scheme-box {
-        background-color: #eef6ff;
-        padding: 25px;
-        border-radius: 15px;
-        border: 1px solid #cce5ff;
-        margin: 20px 0;
-        color: #1a1a1a;
-    }
-    
     .footer {
         text-align: center;
         margin-top: 3rem;
@@ -102,8 +93,6 @@ def retrieve(query_text, top_k=15):
     sources = [match["metadata"]["source"] for match in results["matches"]]
     pages = [match["metadata"].get("page", "?") for match in results["matches"]]
     return contexts, sources, pages
-
-import time  # add this at the top of your file if not already imported
 
 def ask_groq(question, contexts):
     """Send context + question to Groq LLM with retry and error handling."""
@@ -140,7 +129,7 @@ Answer:"""
         # If rate limited, parse the wait time from the error
         error_info = resp.json().get("error", {})
         if error_info.get("code") == "rate_limit_exceeded":
-            wait_time = 10  # wait 10 seconds (the API suggested 4.3s, but we play safe)
+            wait_time = 10  # wait 10 seconds
             if attempt < max_retries - 1:
                 st.warning(f"Rate limit hit. Waiting {wait_time} seconds... (attempt {attempt+1}/{max_retries})")
                 time.sleep(wait_time)
@@ -170,68 +159,3 @@ if question:
     with st.expander("📚 Sources"):
         for s, p in zip(sources, pages):
             st.write(f"- {s} (page {p})")
-
-    # ---- CAIE Finder Search Link ----
-    encoded_question = urllib.parse.quote(question)
-    caie_search_url = f"https://www.caiefinder.com/search?q={encoded_question}"
-    
-    st.write(f"DEBUG: question = '{question}'")
-    st.write(f"DEBUG: encoded = '{encoded_question}'")
-
-    
-    # Only create the link if question is not empty
-    if question.strip():   # ensures no whitespace-only queries
-        encoded_question = urllib.parse.quote(question.strip())
-        caie_search_url = f"https://www.caiefinder.com/search?q={encoded_question}"
-
-        st.markdown(f"""
-            <div class="mark-scheme-box">
-                <h4>📋 Search CAIE Past Papers for this question</h4>
-                <p>Click below to find relevant past papers and mark schemes:</p>
-                <a href="{caie_search_url}" target="_blank" style="...">🔍 Search CAIE Finder</a>
-                <p style="...">Search query: <code>{question}</code></p>
-            </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.warning("The question field is empty. Cannot create search link.")
-# Sidebar: CAIE Finder settings
-st.sidebar.header("🔎 CAIE Finder Search Settings")
-
-subject = st.sidebar.selectbox(
-    "Select Subject",
-    ["Computer Science", "Physics", "Chemistry", "Biology", "Mathematics", "Accounting", "Business Studies", "English"],
-    index=0  # default to Computer Science (or any you prefer)
-)
-
-zone = st.sidebar.selectbox(
-    "Select Level",
-    ["A", "O", "AS"],   # a = A-Level, o = O-Level, as = AS-Level
-    index=0,
-    format_func=lambda x: "A-Level" if x=="a" else ("O-Level" if x=="o" else "AS-Level")
-)
-
-# Sidebar manual search
-manual_query = st.sidebar.text_input("Enter topic or paper code", key="manual_search")
-
-if st.sidebar.button("Search CAIE Finder"):
-    if manual_query and manual_query.strip():
-        encoded_manual = urllib.parse.quote(manual_query.strip())
-        manual_url = f"https://caiefinder.com/search/?subs={subject}&zone={zone}&search={encoded_manual}"
-        st.sidebar.success(f"Searching for: {manual_query}")
-        st.sidebar.markdown(f"[🔍 Open CAIE Finder Results]({manual_url})")
-    else:
-        st.sidebar.warning("Please enter a search term first.")
-if question and question.strip():
-    import urllib.parse
-    encoded_q = urllib.parse.quote(question.strip())
-    # Use subject and zone from the sidebar selectboxes
-    caie_url = f"https://caiefinder.com/search/?subs={subject}&zone={zone}&search={encoded_q}"
-    
-    st.markdown(f"""
-        <div class="mark-scheme-box">
-            <h4>📋 Search CAIE Past Papers for this question</h4>
-            <p>Subject: <strong>{subject}</strong> | Level: <strong>{zone.upper()}-Level</strong></p>
-            <a href="{caie_url}" target="_blank" style="...">🔍 Search CAIE Finder</a>
-            <p style="...">Search query: <code>{question}</code></p>
-        </div>
-    """, unsafe_allow_html=True)
