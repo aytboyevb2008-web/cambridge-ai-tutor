@@ -1,4 +1,4 @@
-[7/6/2026 9:26 PM] Bobur: import streamlit as st
+import streamlit as st
 import requests
 import time
 from sentence_transformers import SentenceTransformer
@@ -137,7 +137,7 @@ Answer:"""
                 continue
         break
     return "⚠️ Sorry, the AI service is temporarily unavailable."
-[7/6/2026 9:26 PM] Bobur: # ---- UI ----
+# ---- UI ----
 st.markdown('<h1 class="main-title">🎓 Cambridge A-Level AI Tutor</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Ask anything from the syllabus. The AI answers <b>only</b> from your official notes and past papers.</p>', unsafe_allow_html=True)
 
