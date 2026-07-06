@@ -81,17 +81,21 @@ index = pc.Index(PINECONE_INDEX_NAME)
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 # ---- FUNCTIONS ----
-def retrieve(query_text, top_k=15):
-    """Embed query, search Pinecone, return contexts."""
+def retrieve(query_text, top_k=10):   # reduced from 15
     query_emb = model.encode(query_text).tolist()
-    results = index.query(
-        vector=query_emb,
-        top_k=top_k,
-        include_metadata=True
-    )
-    contexts = [match["metadata"]["text"] for match in results["matches"]]
-    sources = [match["metadata"]["source"] for match in results["matches"]]
-    pages = [match["metadata"].get("page", "?") for match in results["matches"]]
+    results = index.query(vector=query_emb, top_k=top_k, include_metadata=True)
+    contexts = []
+    sources = []
+    pages = []
+    for match in results["matches"]:
+        text = match["metadata"]["text"]
+        # Keep only the first 300 words of each chunk
+        words = text.split()
+        if len(words) > 300:
+            text = " ".join(words[:300]) + "..."
+        contexts.append(text)
+        sources.append(match["metadata"]["source"])
+        pages.append(match["metadata"].get("page", "?"))
     return contexts, sources, pages
 
 def ask_groq(question, contexts):
@@ -112,7 +116,7 @@ Answer:"""
         "Content-Type": "application/json"
     }
     data = {
-        "model": "llama-3.1-8b-instant",
+        "model": "mixtral-8x7b-32768",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.2,
         "max_tokens": 1000   # increased from 600
