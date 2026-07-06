@@ -188,6 +188,21 @@ if question:
             <p style="margin-top: 10px; font-size: 0.85rem; color: #666;">Search query: <code>{question}</code></p>
         </div>
     """, unsafe_allow_html=True)
+    # Only create the link if question is not empty
+    if question.strip():   # ensures no whitespace-only queries
+        encoded_question = urllib.parse.quote(question.strip())
+        caie_search_url = f"https://www.caiefinder.com/search?q={encoded_question}"
+
+        st.markdown(f"""
+            <div class="mark-scheme-box">
+                <h4>📋 Search CAIE Past Papers for this question</h4>
+                <p>Click below to find relevant past papers and mark schemes:</p>
+                <a href="{caie_search_url}" target="_blank" style="...">🔍 Search CAIE Finder</a>
+                <p style="...">Search query: <code>{question}</code></p>
+            </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.warning("The question field is empty. Cannot create search link.")
 
 # Sidebar manual search
 manual_query = st.sidebar.text_input("Enter topic or paper code", key="manual_search")
