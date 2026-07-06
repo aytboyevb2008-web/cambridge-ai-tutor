@@ -63,13 +63,32 @@ Answer:"""
     return "⚠️ Sorry, the AI service is temporarily unavailable."
 
 # ---- UI ----
+# Initialize cooldown timer (runs only once)
+if "last_question_time" not in st.session_state:
+    st.session_state.last_question_time = 0  # allow first question immediately
+
+COOLDOWN_SECONDS = 15
+
 st.title("🎓 Cambridge A-Level AI Tutor")
 question = st.text_input("Your question:")
+
 if question:
+    # --- Cooldown check ---
+    elapsed = time.time() - st.session_state.last_question_time
+    remaining = COOLDOWN_SECONDS - elapsed
+    if remaining > 0:
+        st.warning(f"⏳ Please wait {remaining:.0f} seconds before asking another question.")
+        st.stop()   # 🛑 Stop everything here – do NOT call the API
+    # -----------------------
+
     with st.spinner("Searching..."):
         contexts, sources, pages = retrieve(question)
         answer = ask_groq(question, contexts)
+
     st.write(answer)
     with st.expander("📚 Sources"):
         for s, p in zip(sources, pages):
             st.write(f"- {s} (page {p})")
+
+    # Save the time of this successful request
+    st.session_state.last_question_time = time.time()
