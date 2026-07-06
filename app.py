@@ -148,7 +148,7 @@ question = st.text_input("Your question:")
 if "last_question_time" not in st.session_state:
     st.session_state.last_question_time = 0  # epoch, allows first question immediately
 
-question = st.text_input("Your question:")
+
 
 if question:
     # --- Cooldown check ---
