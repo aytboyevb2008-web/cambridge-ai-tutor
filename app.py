@@ -135,7 +135,34 @@ Answer:"""
             return "⚠️ Sorry, the AI service is temporarily unavailable."
     except Exception:
         return "⚠️ Network error. Please try again."
+def summarize_topic(question, contexts):
+    """Generate a bullet-point revision summary using the same context."""
+    prompt = f"""You are a Cambridge A-Level tutor. Create a concise revision summary for the topic: "{question}".
+Use ONLY the provided context. Structure the summary with:
+- A one-sentence definition
+- 4–6 bullet points covering the key concepts, examples, and important details
+- End with a "💡 Exam Tip" if the context contains common pitfalls.
 
+Context:
+{chr(10).join(contexts)}
+
+Revision Summary:"""
+
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    data = {
+        "model": "llama-3.1-8b-instant",   # or your preferred model
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+        "max_tokens": 500
+    }
+    try:
+        resp = requests.post(GROQ_URL, headers=headers, json=data, timeout=15)
+        if resp.status_code == 200:
+            return resp.json()["choices"][0]["message"]["content"]
+        else:
+            return "⚠️ Could not generate summary. Please try again."
+    except Exception:
+        return "⚠️ Network error."
 # ---- UI ----
 # Initialize session states
 if "last_question_time" not in st.session_state:
@@ -361,6 +388,32 @@ if question:
         </script>
         """
         st.components.v1.html(tts_html, height=100)
+        # ---- TOPIC SUMMARIZER ----
+        # Initialize a session key for the summary
+        summary_key = f"summary_{question}"
+        if summary_key not in st.session_state:
+            st.session_state[summary_key] = None
+
+        col_summary_btn, _ = st.columns([1, 3])
+        with col_summary_btn:
+            if st.button("📝 Summarize This Topic"):
+                # Apply cooldown before making API call
+                elapsed = time.time() - st.session_state.last_question_time
+                remaining = COOLDOWN_SECONDS - elapsed
+                if remaining > 0:
+                    st.warning(f"⏳ Cooldown active. Please wait {remaining:.0f} seconds.")
+                else:
+                    with st.spinner("Generating revision summary..."):
+                        summary = summarize_topic(question, contexts)
+                        st.session_state[summary_key] = summary
+                        # Update last_question_time to prevent spamming
+                        st.session_state.last_question_time = time.time()
+
+        # Display the summary if it exists
+        if st.session_state[summary_key]:
+            st.markdown("---")
+            st.markdown("### 📝 Revision Summary")
+            st.markdown(f'<div class="answer-box" style="border-left: 5px solid #28a745;">{st.session_state[summary_key]}</div>', unsafe_allow_html=True)
 # ---- MOTIVATIONAL MESSAGES (after streak milestones) ----
 if st.session_state.question_count in [5, 10, 20, 30]:
     st.balloons()
