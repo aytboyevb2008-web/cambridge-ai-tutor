@@ -189,15 +189,12 @@ if question:
         </div>
     """, unsafe_allow_html=True)
 
-# ---- SIDEBAR: Manual Past Paper Search ----
-st.sidebar.header("🔎 Manual Past Paper Search")
-st.sidebar.markdown("Use this to search CAIE Finder directly without asking the AI first.")
-
-manual_query = st.sidebar.text_input("Enter topic or paper code", placeholder="e.g., 9701 digital certificate")
+# Sidebar manual search
+manual_query = st.sidebar.text_input("Enter topic or paper code", key="manual_search")
 
 if st.sidebar.button("Search CAIE Finder"):
-    if manual_query:
-        encoded = urllib.parse.quote(manual_query)
+    if manual_query and manual_query.strip():
+        encoded = urllib.parse.quote(manual_query.strip())
         search_url = f"https://www.caiefinder.com/search?q={encoded}"
         st.sidebar.success(f"Searching for: {manual_query}")
         st.sidebar.markdown(f"[🔍 Open CAIE Finder Results]({search_url})")
