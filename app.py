@@ -65,6 +65,7 @@ st.markdown("""
         border-radius: 15px;
         border: 1px solid #cce5ff;
         margin: 20px 0;
+        color: #1a1a1a;
     }
     
     .footer {
