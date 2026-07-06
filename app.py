@@ -215,9 +215,23 @@ manual_query = st.sidebar.text_input("Enter topic or paper code", key="manual_se
 
 if st.sidebar.button("Search CAIE Finder"):
     if manual_query and manual_query.strip():
-        encoded = urllib.parse.quote(manual_query.strip())
-        search_url = f"https://www.caiefinder.com/search?q={encoded}"
+        encoded_manual = urllib.parse.quote(manual_query.strip())
+        manual_url = f"https://caiefinder.com/search/?subs={subject}&zone={zone}&search={encoded_manual}"
         st.sidebar.success(f"Searching for: {manual_query}")
-        st.sidebar.markdown(f"[🔍 Open CAIE Finder Results]({search_url})")
+        st.sidebar.markdown(f"[🔍 Open CAIE Finder Results]({manual_url})")
     else:
         st.sidebar.warning("Please enter a search term first.")
+if question and question.strip():
+    import urllib.parse
+    encoded_q = urllib.parse.quote(question.strip())
+    # Use subject and zone from the sidebar selectboxes
+    caie_url = f"https://caiefinder.com/search/?subs={subject}&zone={zone}&search={encoded_q}"
+    
+    st.markdown(f"""
+        <div class="mark-scheme-box">
+            <h4>📋 Search CAIE Past Papers for this question</h4>
+            <p>Subject: <strong>{subject}</strong> | Level: <strong>{zone.upper()}-Level</strong></p>
+            <a href="{caie_url}" target="_blank" style="...">🔍 Search CAIE Finder</a>
+            <p style="...">Search query: <code>{question}</code></p>
+        </div>
+    """, unsafe_allow_html=True)
