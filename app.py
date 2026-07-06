@@ -196,22 +196,87 @@ if question:
         st.session_state.question_count += 1
         st.session_state.last_question_time = time.time()
 
-               # ---- TEXT-TO-SPEECH (base64 – no escaping issues) ----
+                      # ---- TEXT-TO-SPEECH (better voice + pause) ----
         encoded = base64.b64encode(answer.encode()).decode()
         tts_html = f"""
-        <button id="readAloudBtn" data-text="{encoded}" onclick="readAloudBase64()" style="padding:8px 16px; background:#1f77b4; color:white; border:none; border-radius:6px; cursor:pointer; margin-top:10px;">
-            🔊 Read Aloud
-        </button>
+        <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px;">
+            <button id="ttsPlayBtn" onclick="startSpeaking()" style="padding:8px 16px; background:#1f77b4; color:white; border:none; border-radius:6px; cursor:pointer;">
+                🔊 Read Aloud
+            </button>
+            <button id="ttsPauseBtn" onclick="togglePause()" style="display:none; padding:8px 16px; background:#ffc107; color:#1a1a1a; border:none; border-radius:6px; cursor:pointer;">
+                ⏸️ Pause
+            </button>
+        </div>
         <script>
-        function readAloudBase64() {{
-            const btn = document.getElementById('readAloudBtn');
-            const encoded = btn.getAttribute('data-text');
-            const decoded = atob(encoded);
-            const msg = new SpeechSynthesisUtterance(decoded);
-            msg.lang = 'en-US';
-            window.speechSynthesis.cancel();
-            window.speechSynthesis.speak(msg);
+        const encodedText = "{encoded}";
+        const fullText = atob(encodedText);
+        let utterance = null;
+        let isPaused = false;
+
+        function getBestVoice() {{
+            const voices = window.speechSynthesis.getVoices();
+            if (voices.length === 0) return null;
+            // Priority list of high-quality female English voices (browser-dependent)
+            const preferred = [
+                'Google US English',          // Chrome
+                'Microsoft Zira',             // Edge/Windows
+                'Samantha',                   // macOS Safari
+                'Karen',                      // macOS alternative
+                'Google UK English Female',   // Chrome
+                'Microsoft Susan'             // older Windows
+            ];
+            for (const pref of preferred) {{
+                const voice = voices.find(v => v.name === pref);
+                if (voice) return voice;
+            }}
+            // Fallback: first English female voice, or any English voice
+            return voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('female'))
+                || voices.find(v => v.lang.startsWith('en'))
+                || voices[0];
         }}
+
+        function startSpeaking() {{
+            window.speechSynthesis.cancel();
+            utterance = new SpeechSynthesisUtterance(fullText);
+            utterance.lang = 'en-US';
+            const voice = getBestVoice();
+            if (voice) utterance.voice = voice;
+            utterance.rate = 0.95;   // slightly slower for clarity
+            utterance.pitch = 1.0;
+            utterance.onend = () => {{
+                document.getElementById('ttsPlayBtn').style.display = 'inline-block';
+                document.getElementById('ttsPauseBtn').style.display = 'none';
+                isPaused = false;
+            }};
+            utterance.onerror = () => {{
+                document.getElementById('ttsPlayBtn').style.display = 'inline-block';
+                document.getElementById('ttsPauseBtn').style.display = 'none';
+                isPaused = false;
+            }};
+            window.speechSynthesis.speak(utterance);
+            document.getElementById('ttsPlayBtn').style.display = 'none';
+            document.getElementById('ttsPauseBtn').style.display = 'inline-block';
+            document.getElementById('ttsPauseBtn').textContent = '⏸️ Pause';
+            isPaused = false;
+        }}
+
+        function togglePause() {{
+            if (!utterance) return;
+            if (isPaused) {{
+                window.speechSynthesis.resume();
+                document.getElementById('ttsPauseBtn').textContent = '⏸️ Pause';
+                isPaused = false;
+            }} else {{
+                window.speechSynthesis.pause();
+                document.getElementById('ttsPauseBtn').textContent = '▶️ Resume';
+                isPaused = true;
+            }}
+        }}
+
+        // Ensure voices are loaded (Chrome requires the event)
+        window.speechSynthesis.onvoiceschanged = () => {{
+            getBestVoice();  // preload
+        }};
         </script>
         """
         st.components.v1.html(tts_html, height=80)
