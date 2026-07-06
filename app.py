@@ -3,6 +3,7 @@ import requests
 import time
 from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone
+import base64
 
 # ---- SETTINGS ----
 PINECONE_API_KEY = st.secrets["PINECONE_API_KEY"]
@@ -195,23 +196,23 @@ if question:
         st.session_state.question_count += 1
         st.session_state.last_question_time = time.time()
 
-        # ---- TEXT-TO-SPEECH (only after a new answer) ----
-               # ---- TEXT-TO-SPEECH ----
-        # Use a simple escaping: remove backslashes and double quotes, replace newlines
-        safe_answer = answer.replace("\\", "\\\\")   # escape backslashes first
-        safe_answer = safe_answer.replace('"', '\\"') # escape double quotes
-        safe_answer = safe_answer.replace("\n", "\\n") # escape newlines
-        safe_answer = safe_answer.replace("\r", "")    # remove carriage returns
-        
+               # ---- TEXT-TO-SPEECH (base64 – no escaping issues) ----
+        encoded = base64.b64encode(answer.encode()).decode()
         tts_html = f"""
-        <button onclick="
-            const msg = new SpeechSynthesisUtterance(\"{safe_answer}\");
+        <button id="readAloudBtn" data-text="{encoded}" onclick="readAloudBase64()" style="padding:8px 16px; background:#1f77b4; color:white; border:none; border-radius:6px; cursor:pointer; margin-top:10px;">
+            🔊 Read Aloud
+        </button>
+        <script>
+        function readAloudBase64() {{
+            const btn = document.getElementById('readAloudBtn');
+            const encoded = btn.getAttribute('data-text');
+            const decoded = atob(encoded);
+            const msg = new SpeechSynthesisUtterance(decoded);
             msg.lang = 'en-US';
             window.speechSynthesis.cancel();
             window.speechSynthesis.speak(msg);
-        " style="padding:8px 16px; background:#1f77b4; color:white; border:none; border-radius:6px; cursor:pointer; margin-top:10px;">
-            🔊 Read Aloud
-        </button>
+        }}
+        </script>
         """
         st.components.v1.html(tts_html, height=80)
 
