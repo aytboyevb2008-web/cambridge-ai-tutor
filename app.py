@@ -3,6 +3,7 @@ import requests
 import time
 from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone
+COOLDOWN_SECONDS = 15  # time to wait between questions
 
 # ---- SETTINGS ----
 PINECONE_API_KEY = st.secrets["PINECONE_API_KEY"]
@@ -143,7 +144,22 @@ st.markdown('<p class="subtitle">Ask anything from the syllabus. The AI answers 
 
 question = st.text_input("Your question:")
 
+# Initialize session state for cooldown
+if "last_question_time" not in st.session_state:
+    st.session_state.last_question_time = 0  # epoch, allows first question immediately
+
+question = st.text_input("Your question:")
+
 if question:
+    # --- Cooldown check ---
+    elapsed = time.time() - st.session_state.last_question_time
+    remaining = COOLDOWN_SECONDS - elapsed
+    if remaining > 0:
+        st.warning(f"⏳ Please wait {remaining:.0f} seconds before asking another question.")
+        st.stop()  # stop further execution, don't process the question
+    # -----------------------
+    
+    # Process the question only if cooldown passed
     with st.spinner("Searching your notes..."):
         contexts, sources, pages = retrieve(question)
         answer = ask_groq(question, contexts)
@@ -155,3 +171,6 @@ if question:
     with st.expander("📚 Sources"):
         for s, p in zip(sources, pages):
             st.write(f"- {s} (page {p})")
+
+    # Save the time of this successful request
+    st.session_state.last_question_time = time.time()
