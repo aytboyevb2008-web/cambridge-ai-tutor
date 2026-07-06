@@ -142,13 +142,13 @@ Answer:"""
 st.markdown('<h1 class="main-title">🎓 Cambridge A-Level AI Tutor</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Ask anything from the syllabus. The AI answers <b>only</b> from your official notes and past papers.</p>', unsafe_allow_html=True)
 
-question = st.text_input("Your question:")
+
 
 # Initialize session state for cooldown
 if "last_question_time" not in st.session_state:
     st.session_state.last_question_time = 0  # epoch, allows first question immediately
 
-
+question = st.text_input("Your question:")
 
 if question:
     # --- Cooldown check ---
