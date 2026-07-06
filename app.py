@@ -174,6 +174,8 @@ if question:
     # ---- CAIE Finder Search Link ----
     encoded_question = urllib.parse.quote(question)
     caie_search_url = f"https://www.caiefinder.com/search?q={encoded_question}"
+    
+    st.write(f"DEBUG: Generated search URL = {caie_search_url}")   # <-- add this
 
     st.markdown(f"""
         <div class="mark-scheme-box">
