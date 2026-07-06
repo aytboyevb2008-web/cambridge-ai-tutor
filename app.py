@@ -103,7 +103,7 @@ def retrieve(query_text, top_k=15):
     return contexts, sources, pages
 
 def ask_groq(question, contexts):
-    """Send context + question to Groq LLM."""
+    """Send context + question to Groq LLM with debug output."""
     prompt = f"""You are a Cambridge A-Level tutor. Answer the student's question using ONLY the provided context.
 If the answer is not in the context, say: "I don't have this in my notes. Please check your textbook."
 Be concise and exam-focused.
@@ -125,6 +125,12 @@ Answer:"""
         "max_tokens": 600
     }
     resp = requests.post(GROQ_URL, headers=headers, json=data)
+    
+    # ---- DEBUG: display the raw response ----
+    st.write("### DEBUG: Raw Groq API response")
+    st.json(resp.json())   # this will show the full JSON on the app page
+    # -----------------------------------------
+    
     return resp.json()["choices"][0]["message"]["content"]
 
 # ---- UI ----
