@@ -178,16 +178,7 @@ if question:
     st.write(f"DEBUG: question = '{question}'")
     st.write(f"DEBUG: encoded = '{encoded_question}'")
 
-    st.markdown(f"""
-        <div class="mark-scheme-box">
-            <h4>📋 Search CAIE Past Papers for this question</h4>
-            <p>Click below to find relevant past papers and mark schemes:</p>
-            <a href="{caie_search_url}" target="_blank" style="display: inline-block; padding: 12px 24px; background: #1f77b4; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
-                🔍 Search CAIE Finder
-            </a>
-            <p style="margin-top: 10px; font-size: 0.85rem; color: #666;">Search query: <code>{question}</code></p>
-        </div>
-    """, unsafe_allow_html=True)
+    
     # Only create the link if question is not empty
     if question.strip():   # ensures no whitespace-only queries
         encoded_question = urllib.parse.quote(question.strip())
