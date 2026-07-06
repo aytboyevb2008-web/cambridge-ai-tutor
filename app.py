@@ -165,7 +165,55 @@ if st.session_state.question_count > 0:
     st.markdown(f'<span class="streak-badge">🔥 {st.session_state.question_count} questions answered this session</span>', unsafe_allow_html=True)
 
 question = st.text_input("Your question:")
+# ---- SIDEBAR: Past Paper Search ----
+st.sidebar.header("🔎 Search CAIE Past Papers")
 
+subject = st.sidebar.selectbox(
+    "Subject",
+    options=[
+        "computerscience", "physics", "chemistry", "biology",
+        "mathematics", "economics", "business", "accounting",
+        "english", "history", "geography", "psychology"
+    ],
+    index=0,
+    help="Choose the Cambridge subject exactly as it appears on CAIE Finder."
+)
+
+zone = st.sidebar.selectbox(
+    "Level",
+    options=["a", "o", "as"],
+    index=0,
+    format_func=lambda x: {"a": "A-Level", "o": "O-Level", "as": "AS-Level"}[x],
+    help="A-Level, O-Level, or AS-Level."
+)
+
+search_term = st.sidebar.text_input(
+    "Topic or paper code",
+    placeholder="e.g., 9701 MAC address or 9701/21/O/N/23",
+    key="sidebar_search_term"   # unique key to avoid conflicts
+)
+
+if st.sidebar.button("🔍 Search CAIE Finder", use_container_width=True):
+    if search_term and search_term.strip():
+        import urllib.parse
+        encoded = urllib.parse.quote(search_term.strip())
+        # Build the exact CAIE Finder URL
+        url = f"https://caiefinder.com/search/?subs={subject}&zone={zone}&search={encoded}"
+        # Show link that opens in a new tab
+        st.sidebar.markdown(f"""
+            <a href="{url}" target="_blank" style="
+                display: inline-block;
+                padding: 10px 20px;
+                background: #1f77b4;
+                color: white;
+                text-decoration: none;
+                border-radius: 6px;
+                font-weight: 600;
+                margin-top: 10px;
+            ">Open CAIE Finder Results</a>
+        """, unsafe_allow_html=True)
+    else:
+        st.sidebar.warning("Please enter a search term first.")
 if question:
     # Cooldown check
     elapsed = time.time() - st.session_state.last_question_time
