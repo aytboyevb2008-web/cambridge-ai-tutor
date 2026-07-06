@@ -194,6 +194,21 @@ if question:
         """, unsafe_allow_html=True)
     else:
         st.warning("The question field is empty. Cannot create search link.")
+# Sidebar: CAIE Finder settings
+st.sidebar.header("🔎 CAIE Finder Search Settings")
+
+subject = st.sidebar.selectbox(
+    "Select Subject",
+    ["Computer Science", "Physics", "Chemistry", "Biology", "Mathematics", "Accounting", "Business Studies", "English"],
+    index=0  # default to Computer Science (or any you prefer)
+)
+
+zone = st.sidebar.selectbox(
+    "Select Level",
+    ["A", "O", "AS"],   # a = A-Level, o = O-Level, as = AS-Level
+    index=0,
+    format_func=lambda x: "A-Level" if x=="a" else ("O-Level" if x=="o" else "AS-Level")
+)
 
 # Sidebar manual search
 manual_query = st.sidebar.text_input("Enter topic or paper code", key="manual_search")
