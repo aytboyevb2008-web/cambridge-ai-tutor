@@ -166,7 +166,18 @@ if st.session_state.question_count > 0:
 
 question = st.text_input("Your question:")
 # ---- SIDEBAR: Past Paper Search ----
+# ---- SIDEBAR: Past Paper Search ----
 st.sidebar.header("🔎 Search CAIE Past Papers")
+
+# ℹ️ Instructions expander
+with st.sidebar.expander("ℹ️ Search Tips"):
+    st.markdown("""
+    **For the best results:**
+    - Write the **exact topic** (e.g., *MAC address*, *Doppler effect*, *stacks and queues*).
+    - Do **not** write the syllabus code (e.g., 9701) in the search box – use the **Subject** and **Level** dropdowns instead.
+    - Use the correct subject and level to narrow down papers.
+    - You can search for a specific paper code if you know it (e.g., *9702/21/O/N/23*).
+    """)
 
 subject = st.sidebar.selectbox(
     "Subject",
@@ -189,18 +200,20 @@ zone = st.sidebar.selectbox(
 
 search_term = st.sidebar.text_input(
     "Topic or paper code",
-    placeholder="e.g., 9701 MAC address or 9701/21/O/N/23",
-    key="sidebar_search_term"   # unique key to avoid conflicts
+    placeholder="e.g., MAC address or 9702/21/O/N/23",
+    key="sidebar_search_term"
 )
+
+# Placeholder for the result link – it will be refreshed on every search
+result_placeholder = st.sidebar.empty()
 
 if st.sidebar.button("🔍 Search CAIE Finder", use_container_width=True):
     if search_term and search_term.strip():
         import urllib.parse
         encoded = urllib.parse.quote(search_term.strip())
-        # Build the exact CAIE Finder URL
         url = f"https://caiefinder.com/search/?subs={subject}&zone={zone}&search={encoded}"
-        # Show link that opens in a new tab
-        st.sidebar.markdown(f"""
+        # Replace the placeholder content with the new link
+        result_placeholder.markdown(f"""
             <a href="{url}" target="_blank" style="
                 display: inline-block;
                 padding: 10px 20px;
@@ -213,7 +226,7 @@ if st.sidebar.button("🔍 Search CAIE Finder", use_container_width=True):
             ">Open CAIE Finder Results</a>
         """, unsafe_allow_html=True)
     else:
-        st.sidebar.warning("Please enter a search term first.")
+        result_placeholder.warning("Please enter a search term first.")
 if question:
     # Cooldown check
     elapsed = time.time() - st.session_state.last_question_time
