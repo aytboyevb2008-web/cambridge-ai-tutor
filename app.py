@@ -177,7 +177,8 @@ if "last_sources" not in st.session_state:
     st.session_state.last_sources = []
 if "last_pages" not in st.session_state:
     st.session_state.last_pages = []
-
+if "last_contexts" not in st.session_state:
+    st.session_state.last_contexts = []
 COOLDOWN_SECONDS = 15
 
 # Styled headers
@@ -282,7 +283,8 @@ if question:
         st.session_state.last_question = question
         st.session_state.last_answer = answer
         st.session_state.last_sources = sources       
-        st.session_state.last_pages = pages 
+        st.session_state.last_pages = pages
+        st.session_state.last_contexts = contexts
         st.session_state.question_count += 1
         st.session_state.last_question_time = time.time()
 
@@ -409,7 +411,7 @@ if question:
                 st.toast(f"⏳ Please wait {COOLDOWN_SECONDS - elapsed:.0f} seconds before summarizing again.", icon="⏳")
             else:
                 with st.spinner("Generating revision summary..."):
-                    summary = summarize_topic(question, contexts)
+                    summary = summarize_topic(question, st.session_state.last_contexts)
                     st.session_state[summary_key] = summary
                     st.session_state.last_summary_time = time.time()
 
