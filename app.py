@@ -173,6 +173,10 @@ if "last_answer" not in st.session_state:
     st.session_state.last_answer = ""
 if "last_question" not in st.session_state:
     st.session_state.last_question = ""
+if "last_sources" not in st.session_state:
+    st.session_state.last_sources = []
+if "last_pages" not in st.session_state:
+    st.session_state.last_pages = []
 
 COOLDOWN_SECONDS = 15
 
@@ -277,6 +281,8 @@ if question:
         # Save to session
         st.session_state.last_question = question
         st.session_state.last_answer = answer
+        st.session_state.last_sources = sources       
+        st.session_state.last_pages = pages 
         st.session_state.question_count += 1
         st.session_state.last_question_time = time.time()
 
@@ -284,7 +290,7 @@ if question:
     st.markdown(f'<div class="answer-box">{answer}</div>', unsafe_allow_html=True)
 
     with st.expander("📚 Sources"):
-        for s, p in zip(sources, pages):
+        for s, p in zip(st.session_state.last_sources, st.session_state.last_pages):
             st.write(f"- {s} (page {p})")
                    
                 # ---- TEXT-TO-SPEECH (manual voice selector, pause) ----
