@@ -196,22 +196,24 @@ if question:
         st.session_state.last_question_time = time.time()
 
         # ---- TEXT-TO-SPEECH (only after a new answer) ----
-        # Escape the answer for safe embedding in JavaScript
-        safe_answer = answer.replace("`", "\\`").replace("$", "\\$")
+               # ---- TEXT-TO-SPEECH ----
+        # Use a simple escaping: remove backslashes and double quotes, replace newlines
+        safe_answer = answer.replace("\\", "\\\\")   # escape backslashes first
+        safe_answer = safe_answer.replace('"', '\\"') # escape double quotes
+        safe_answer = safe_answer.replace("\n", "\\n") # escape newlines
+        safe_answer = safe_answer.replace("\r", "")    # remove carriage returns
+        
         tts_html = f"""
-        <button onclick="speakAnswer()" style="padding:8px 16px; background:#1f77b4; color:white; border:none; border-radius:6px; cursor:pointer; margin-top:10px;">
-            🔊 Read Aloud
-        </button>
-        <script>
-        function speakAnswer() {{
-            const msg = new SpeechSynthesisUtterance(`{safe_answer}`);
+        <button onclick="
+            const msg = new SpeechSynthesisUtterance(\"{safe_answer}\");
             msg.lang = 'en-US';
             window.speechSynthesis.cancel();
             window.speechSynthesis.speak(msg);
-        }}
-        </script>
+        " style="padding:8px 16px; background:#1f77b4; color:white; border:none; border-radius:6px; cursor:pointer; margin-top:10px;">
+            🔊 Read Aloud
+        </button>
         """
-        st.components.v1.html(tts_html, height=60)
+        st.components.v1.html(tts_html, height=80)
 
 # ---- MOTIVATIONAL MESSAGES (after streak milestones) ----
 if st.session_state.question_count in [5, 10, 20, 30]:
