@@ -95,10 +95,11 @@ def retrieve(query_text, top_k=15):
     return contexts, sources, pages
 
 def ask_groq(question, contexts):
-    """Send context + question to Groq LLM with retry and error handling."""
     prompt = f"""You are a Cambridge A-Level tutor. Answer the student's question using ONLY the provided context.
 If the answer is not in the context, say: "I don't have this in my notes. Please check your textbook."
-Be concise and exam-focused.
+Provide a comprehensive, detailed explanation suitable for an A‑Level student.
+Cover key definitions, examples, and related concepts found in the context.
+Use full sentences and structured paragraphs.
 
 Context:
 {chr(10).join(contexts)}
@@ -114,32 +115,23 @@ Answer:"""
         "model": "llama-3.1-8b-instant",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.2,
-        "max_tokens": 600
+        "max_tokens": 1000   # increased from 600
     }
     
-    # Try up to 3 times with a wait
     max_retries = 3
     for attempt in range(max_retries):
         resp = requests.post(GROQ_URL, headers=headers, json=data)
-        
-        # If successful, return answer
         if resp.status_code == 200:
             return resp.json()["choices"][0]["message"]["content"]
-        
-        # If rate limited, parse the wait time from the error
         error_info = resp.json().get("error", {})
         if error_info.get("code") == "rate_limit_exceeded":
-            wait_time = 10  # wait 10 seconds
+            wait_time = 10
             if attempt < max_retries - 1:
-                st.warning(f"Rate limit hit. Waiting {wait_time} seconds... (attempt {attempt+1}/{max_retries})")
+                st.warning(f"Rate limit hit. Waiting {wait_time} seconds...")
                 time.sleep(wait_time)
                 continue
-        
-        # Other errors – break and show message
         break
-    
-    # If all retries failed, return a friendly error message
-    return "⚠️ Sorry, the AI service is temporarily unavailable. Please try again in a minute."
+    return "⚠️ Sorry, the AI service is temporarily unavailable."
 
 # ---- UI ----
 st.markdown('<h1 class="main-title">🎓 Cambridge A-Level AI Tutor</h1>', unsafe_allow_html=True)
