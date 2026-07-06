@@ -44,6 +44,7 @@ st.markdown("""
     }
 
     .answer-box {
+        color: #1a1a1a;
         background-color: #f8f9fa;
         padding: 25px;
         border-radius: 15px;
