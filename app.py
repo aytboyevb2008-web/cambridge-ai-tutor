@@ -198,63 +198,71 @@ if question:
 
                       # ---- TEXT-TO-SPEECH (better voice + pause) ----
                # ---- TEXT-TO-SPEECH (pre-load voices, debug log) ----
+                # ---- TEXT-TO-SPEECH (manual voice selector, pause) ----
         encoded = base64.b64encode(answer.encode()).decode()
         tts_html = f"""
-        <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px;">
-            <button id="ttsPlayBtn" onclick="startSpeaking()" style="padding:8px 16px; background:#1f77b4; color:white; border:none; border-radius:6px; cursor:pointer;">
-                🔊 Read Aloud
-            </button>
-            <button id="ttsPauseBtn" onclick="togglePause()" style="display:none; padding:8px 16px; background:#ffc107; color:#1a1a1a; border:none; border-radius:6px; cursor:pointer;">
-                ⏸️ Pause
-            </button>
+        <div style="margin-top: 10px;">
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <select id="voiceSelect" style="padding:6px; border-radius:4px; border:1px solid #ccc;">
+                    <option value="">Loading voices...</option>
+                </select>
+                <button id="ttsPlayBtn" onclick="startSpeaking()" style="padding:8px 16px; background:#1f77b4; color:white; border:none; border-radius:6px; cursor:pointer;">
+                    🔊 Read Aloud
+                </button>
+                <button id="ttsPauseBtn" onclick="togglePause()" style="display:none; padding:8px 16px; background:#ffc107; color:#1a1a1a; border:none; border-radius:6px; cursor:pointer;">
+                    ⏸️ Pause
+                </button>
+            </div>
         </div>
         <script>
         const encodedText = "{encoded}";
         const fullText = atob(encodedText);
         let utterance = null;
         let isPaused = false;
+        const voiceSelect = document.getElementById('voiceSelect');
 
-        // Force voices to load by calling getVoices() (some browsers need this)
-        window.speechSynthesis.getVoices();
-
-        function getBestVoice() {{
+        function populateVoices() {{
             const voices = window.speechSynthesis.getVoices();
-            if (voices.length === 0) {{
-                console.warn('No voices loaded yet');
-                return null;
+            if (voices.length === 0) return;
+            voiceSelect.innerHTML = '';
+            // Add only English voices (you can remove this filter if you want all)
+            const englishVoices = voices.filter(v => v.lang.startsWith('en'));
+            if (englishVoices.length === 0) {{
+                // fallback: show all voices
+                voices.forEach(v => {{
+                    const option = document.createElement('option');
+                    option.value = v.name;
+                    option.textContent = `${{v.name}} (${{v.lang}})`;
+                    voiceSelect.appendChild(option);
+                }});
+            }} else {{
+                englishVoices.forEach(v => {{
+                    const option = document.createElement('option');
+                    option.value = v.name;
+                    option.textContent = `${{v.name}} (${{v.lang}})`;
+                    voiceSelect.appendChild(option);
+                }});
             }}
-            // Preferred female English voices
-            const preferred = [
-                'Google US English',
-                'Microsoft Zira',
-                'Samantha',
-                'Karen',
-                'Google UK English Female',
-                'Microsoft Susan',
-                'Moira'   // macOS additional
-            ];
-            for (const pref of preferred) {{
-                const voice = voices.find(v => v.name === pref);
-                if (voice) {{
-                    console.log('Selected voice:', voice.name);
-                    return voice;
-                }}
-            }}
-            // Fallback
-            const fallback = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('female'))
-                || voices.find(v => v.lang.startsWith('en'))
-                || voices[0];
-            console.log('Fallback voice:', fallback ? fallback.name : 'none');
-            return fallback;
+        }}
+
+        // Populate on load and when voices change
+        populateVoices();
+        window.speechSynthesis.onvoiceschanged = () => {{
+            populateVoices();
+        }};
+
+        function getSelectedVoice() {{
+            const voices = window.speechSynthesis.getVoices();
+            const selectedName = voiceSelect.value;
+            return voices.find(v => v.name === selectedName) || null;
         }}
 
         function startSpeaking() {{
             window.speechSynthesis.cancel();
-            // Small delay to ensure voices are fully loaded (Chrome sometimes needs it)
             setTimeout(() => {{
                 utterance = new SpeechSynthesisUtterance(fullText);
                 utterance.lang = 'en-US';
-                const voice = getBestVoice();
+                const voice = getSelectedVoice();
                 if (voice) utterance.voice = voice;
                 utterance.rate = 0.95;
                 utterance.pitch = 1.0;
@@ -274,7 +282,7 @@ if question:
                 document.getElementById('ttsPauseBtn').style.display = 'inline-block';
                 document.getElementById('ttsPauseBtn').textContent = '⏸️ Pause';
                 isPaused = false;
-            }}, 50);  // 50ms delay
+            }}, 50);
         }}
 
         function togglePause() {{
@@ -289,14 +297,9 @@ if question:
                 isPaused = true;
             }}
         }}
-
-        window.speechSynthesis.onvoiceschanged = () => {{
-            console.log('Voices loaded');
-        }};
         </script>
         """
-        st.components.v1.html(tts_html, height=80)
-
+        st.components.v1.html(tts_html, height=100)
 # ---- MOTIVATIONAL MESSAGES (after streak milestones) ----
 if st.session_state.question_count in [5, 10, 20, 30]:
     st.balloons()
