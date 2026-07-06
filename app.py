@@ -197,6 +197,7 @@ if question:
         st.session_state.last_question_time = time.time()
 
                       # ---- TEXT-TO-SPEECH (better voice + pause) ----
+               # ---- TEXT-TO-SPEECH (pre-load voices, debug log) ----
         encoded = base64.b64encode(answer.encode()).decode()
         tts_html = f"""
         <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px;">
@@ -213,51 +214,67 @@ if question:
         let utterance = null;
         let isPaused = false;
 
+        // Force voices to load by calling getVoices() (some browsers need this)
+        window.speechSynthesis.getVoices();
+
         function getBestVoice() {{
             const voices = window.speechSynthesis.getVoices();
-            if (voices.length === 0) return null;
-            // Priority list of high-quality female English voices (browser-dependent)
+            if (voices.length === 0) {{
+                console.warn('No voices loaded yet');
+                return null;
+            }}
+            // Preferred female English voices
             const preferred = [
-                'Google US English',          // Chrome
-                'Microsoft Zira',             // Edge/Windows
-                'Samantha',                   // macOS Safari
-                'Karen',                      // macOS alternative
-                'Google UK English Female',   // Chrome
-                'Microsoft Susan'             // older Windows
+                'Google US English',
+                'Microsoft Zira',
+                'Samantha',
+                'Karen',
+                'Google UK English Female',
+                'Microsoft Susan',
+                'Moira'   // macOS additional
             ];
             for (const pref of preferred) {{
                 const voice = voices.find(v => v.name === pref);
-                if (voice) return voice;
+                if (voice) {{
+                    console.log('Selected voice:', voice.name);
+                    return voice;
+                }}
             }}
-            // Fallback: first English female voice, or any English voice
-            return voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('female'))
+            // Fallback
+            const fallback = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('female'))
                 || voices.find(v => v.lang.startsWith('en'))
                 || voices[0];
+            console.log('Fallback voice:', fallback ? fallback.name : 'none');
+            return fallback;
         }}
 
         function startSpeaking() {{
             window.speechSynthesis.cancel();
-            utterance = new SpeechSynthesisUtterance(fullText);
-            utterance.lang = 'en-US';
-            const voice = getBestVoice();
-            if (voice) utterance.voice = voice;
-            utterance.rate = 0.95;   // slightly slower for clarity
-            utterance.pitch = 1.0;
-            utterance.onend = () => {{
-                document.getElementById('ttsPlayBtn').style.display = 'inline-block';
-                document.getElementById('ttsPauseBtn').style.display = 'none';
+            // Small delay to ensure voices are fully loaded (Chrome sometimes needs it)
+            setTimeout(() => {{
+                utterance = new SpeechSynthesisUtterance(fullText);
+                utterance.lang = 'en-US';
+                const voice = getBestVoice();
+                if (voice) utterance.voice = voice;
+                utterance.rate = 0.95;
+                utterance.pitch = 1.0;
+                utterance.onend = () => {{
+                    document.getElementById('ttsPlayBtn').style.display = 'inline-block';
+                    document.getElementById('ttsPauseBtn').style.display = 'none';
+                    isPaused = false;
+                }};
+                utterance.onerror = (e) => {{
+                    console.error('Speech error:', e);
+                    document.getElementById('ttsPlayBtn').style.display = 'inline-block';
+                    document.getElementById('ttsPauseBtn').style.display = 'none';
+                    isPaused = false;
+                }};
+                window.speechSynthesis.speak(utterance);
+                document.getElementById('ttsPlayBtn').style.display = 'none';
+                document.getElementById('ttsPauseBtn').style.display = 'inline-block';
+                document.getElementById('ttsPauseBtn').textContent = '⏸️ Pause';
                 isPaused = false;
-            }};
-            utterance.onerror = () => {{
-                document.getElementById('ttsPlayBtn').style.display = 'inline-block';
-                document.getElementById('ttsPauseBtn').style.display = 'none';
-                isPaused = false;
-            }};
-            window.speechSynthesis.speak(utterance);
-            document.getElementById('ttsPlayBtn').style.display = 'none';
-            document.getElementById('ttsPauseBtn').style.display = 'inline-block';
-            document.getElementById('ttsPauseBtn').textContent = '⏸️ Pause';
-            isPaused = false;
+            }}, 50);  // 50ms delay
         }}
 
         function togglePause() {{
@@ -273,9 +290,8 @@ if question:
             }}
         }}
 
-        // Ensure voices are loaded (Chrome requires the event)
         window.speechSynthesis.onvoiceschanged = () => {{
-            getBestVoice();  // preload
+            console.log('Voices loaded');
         }};
         </script>
         """
