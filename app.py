@@ -192,7 +192,7 @@ if question:
 # ---- SIDEBAR: Manual Past Paper Search ----
 st.sidebar.header("🔎 Manual Past Paper Search")
 st.sidebar.markdown("Use this to search CAIE Finder directly without asking the AI first.")
-st.sidebar.write(f"DEBUG: manual_query = '{manual_query}'")
+
 manual_query = st.sidebar.text_input("Enter topic or paper code", placeholder="e.g., 9701 digital certificate")
 
 if st.sidebar.button("Search CAIE Finder"):
