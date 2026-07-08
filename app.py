@@ -135,9 +135,21 @@ Answer:"""
             return "⚠️ Sorry, the AI service is temporarily unavailable."
     except Exception:
         return "⚠️ Network error. Please try again."
-def summarize_topic(question, contexts):
+def summarize_topic(question, contexts, language="English"):
     """Generate a bullet-point revision summary using the same context."""
-    prompt = f"""You are a Cambridge A-Level tutor. Create a concise revision summary for the topic: "{question}".
+    if language == "Oʻzbekcha":
+        prompt = f"""Siz Cambridge A-Level o'qituvchisisiz. "{question}" mavzusi bo'yicha qisqa takrorlash eslatmalarini yarating.
+Faqat berilgan kontekstdan foydalaning. Quyidagi tuzilishda yozing:
+- Bir jumlali ta'rif
+- 4–6 asosiy tushuncha, misollar va muhim tafsilotlar uchun band ro'yxati
+- Agar kontekstda umumiy xatolar haqida ma'lumot bo'lsa, "💡 Imtihon maslahati" bilan yakunlang.
+
+Kontekst:
+{chr(10).join(contexts)}
+
+Takrorlash Xulosasi:"""
+    else:
+        prompt = f"""You are a Cambridge A-Level tutor. Create a concise revision summary for the topic: "{question}".
 Use ONLY the provided context. Structure the summary with:
 - A one-sentence definition
 - 4–6 bullet points covering the key concepts, examples, and important details
@@ -411,7 +423,7 @@ if question:
                 st.toast(f"⏳ Please wait {COOLDOWN_SECONDS - elapsed:.0f} seconds before summarizing again.", icon="⏳")
             else:
                 with st.spinner("Generating revision summary..."):
-                    summary = summarize_topic(question, st.session_state.last_contexts)
+                    summary = summarize_topic(question, st.session_state.last_contexts, language=language)
                     st.session_state[summary_key] = summary
                     st.session_state.last_summary_time = time.time()
 
