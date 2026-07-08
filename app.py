@@ -203,7 +203,13 @@ with col1:
     detail_level = st.radio("📝 Answer Detail", ["detailed", "concise"], horizontal=True, index=0)
 with col2:
     simple_mode = st.toggle("🧒 Explain Like I'm 5", value=False)
-
+# 🌐 Language selector
+language = st.selectbox(
+    "🌐 Language / Til",
+    options=["English", "Oʻzbekcha"],
+    index=0,
+    help="Choose the language for answers."
+)
 # Streak display
 if st.session_state.question_count > 0:
     st.markdown(f'<span class="streak-badge">🔥 {st.session_state.question_count} questions answered this session</span>', unsafe_allow_html=True)
@@ -273,7 +279,10 @@ if st.sidebar.button("🔍 Search CAIE Finder", use_container_width=True):
         result_placeholder.warning("Please enter a search term first.")
 if question:
     # ---- CACHE CHECK (before cooldown) ----
-    if question == st.session_state.get("last_question", None):
+    if (question == st.session_state.get("last_question", None)
+    and detail_level == st.session_state.get("last_detail", None)
+    and simple_mode == st.session_state.get("last_simple", None)
+    and language == st.session_state.get("last_language", None)):
         # Same question – serve cached answer instantly, ignore cooldown
         answer = st.session_state.last_answer
     else:
@@ -289,7 +298,7 @@ if question:
         # Process new question
         with st.spinner("Searching your notes..."):
             contexts, sources, pages = retrieve(question)
-            answer = ask_groq(question, contexts, detail=detail_level, simple=simple_mode)
+            answer = ask_groq(question, contexts, detail=detail_level, simple=simple_mode, language=language)
         
         # Save to session
         st.session_state.last_question = question
