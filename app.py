@@ -4,7 +4,7 @@ import time
 from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone
 import base64
-
+import time
 # ---- SETTINGS ----
 PINECONE_API_KEY = st.secrets["PINECONE_API_KEY"]
 PINECONE_INDEX_NAME = "cambridge-notes"
@@ -135,6 +135,9 @@ Answer:"""
             return "⚠️ Sorry, the AI service is temporarily unavailable."
     except Exception:
         return "⚠️ Network error. Please try again."
+
+
+
 def summarize_topic(question, contexts, language="English"):
     """Generate a bullet-point revision summary using the same context."""
     if language == "Oʻzbekcha":
@@ -175,6 +178,203 @@ Revision Summary:"""
             return "⚠️ Could not generate summary. Please try again."
     except Exception:
         return "⚠️ Network error."
+
+def check_syllabus_coverage(topics, contexts_cache=None):
+    """Use the LLM to check whether each topic is covered by the notes.
+    Returns covered list, not_covered list, and percentage.
+    """
+    covered = []
+    not_covered = []
+    total = len(topics)
+    if total == 0:
+        return covered, not_covered, 0
+
+    # If we don't have a pre-retrieved context for all notes, we'll get a sample of chunks
+    if contexts_cache is None:
+        # Retrieve a broad set of chunks (up to 50) to represent the whole knowledge base
+        # We'll use a dummy query to get diverse chunks
+        sample_emb = model.encode("Cambridge A-Level syllabus").tolist()
+        results = index.query(vector=sample_emb, top_k=50, include_metadata=True)
+        contexts_cache = [m["metadata"]["text"] for m in results["matches"]]
+
+    progress_bar = st.progress(0)
+    for i, topic in enumerate(topics):
+        topic = topic.strip()
+        if not topic:
+            continue
+
+        # Ask the LLM: is this topic covered?
+        prompt = f"""You are an assistant that checks if a specific syllabus topic is present in a collection of study notes.
+Read the notes and answer only "Yes" if the topic is clearly explained or discussed, otherwise answer "No".
+Topic: {topic}
+
+Notes (excerpts):
+{chr(10).join(contexts_cache[:10])}  # limit to 10 chunks to save tokens
+
+Is the topic "{topic}" covered in these notes? (Yes/No):"""
+
+        headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+        data = {
+            "model": "llama-3.1-8b-instant",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0,
+            "max_tokens": 5
+        }
+        try:
+            resp = requests.post(GROQ_URL, headers=headers, json=data, timeout=15)
+            if resp.status_code == 200:
+                answer = resp.json()["choices"][0]["message"]["content"].strip().lower()
+                if answer.startswith("yes"):
+                    covered.append(topic)
+                else:
+                    not_covered.append(topic)
+            else:
+                not_covered.append(topic)
+        except Exception:
+            not_covered.append(topic)
+
+        progress_bar.progress((i + 1) / total)
+        time.sleep(0.5)  # small delay to avoid rate limits
+
+    progress_bar.empty()
+    percent = (len(covered) / total * 100) if total else 0
+    return covered, not_covered, percent
+
+# ---- SIDEBAR: Syllabus Coverage Tracker ----
+st.sidebar.header("📈 Syllabus Coverage")
+
+# Subject syllabus lists (add more if needed)
+SYLLABUS_TOPICS = {
+    "Computer Science (9618)": [
+        "Information representation",
+        "Communication and Internet technologies",
+        "Hardware",
+        "Processor fundamentals",
+        "Assembly language",
+        "System software",
+        "Security, privacy and data integrity",
+        "Ethics and ownership",
+        "Databases",
+        "Algorithm design and problem-solving",
+        "Programming",
+        "Data types and structures",
+        "Logic gates and circuits",
+        "Computer architecture",
+        "Networking",
+        "Internet principles",
+        "Digital logic",
+        "Artificial intelligence"
+    ],
+    "Physics (9702)": [
+        "Physical quantities and units",
+        "Measurement techniques",
+        "Kinematics",
+        "Dynamics",
+        "Forces, density and pressure",
+        "Work, energy and power",
+        "Deformation of solids",
+        "Waves",
+        "Superposition",
+        "Electric fields",
+        "Current of electricity",
+        "D.C. circuits",
+        "Particle and nuclear physics",
+        "Motion in a circle",
+        "Gravitational fields",
+        "Temperature",
+        "Ideal gases",
+        "Thermodynamics",
+        "Oscillations",
+        "Communication"
+    ],
+    "Chemistry (9701)": [
+        "Atomic structure",
+        "Bonding",
+        "States of matter",
+        "Chemical energetics",
+        "Electrochemistry",
+        "Equilibria",
+        "Reaction kinetics",
+        "Periodicity",
+        "Group 2",
+        "Group 17",
+        "Nitrogen and sulfur",
+        "Introduction to organic chemistry",
+        "Hydrocarbons",
+        "Halogenoalkanes",
+        "Alcohols",
+        "Carbonyl compounds",
+        "Carboxylic acids and derivatives",
+        "Nitrogen compounds",
+        "Polymerisation",
+        "Analytical techniques"
+    ],
+    "Biology (9700)": [
+        "Cell structure",
+        "Biological molecules",
+        "Enzymes",
+        "Cell membranes and transport",
+        "The mitotic cell cycle",
+        "Nucleic acids and protein synthesis",
+        "Transport in plants",
+        "Transport in mammals",
+        "Gas exchange and smoking",
+        "Infectious diseases",
+        "Immunity",
+        "Energy and respiration",
+        "Photosynthesis",
+        "Homeostasis",
+        "Coordination",
+        "Inherited change",
+        "Selection and evolution",
+        "Biodiversity",
+        "Genetic technology"
+    ]
+}
+
+subject_choice = st.sidebar.selectbox(
+    "Choose a subject syllabus:",
+    list(SYLLABUS_TOPICS.keys()),
+    index=0,
+    help="Select the Cambridge subject to check coverage against."
+)
+
+topics = SYLLABUS_TOPICS.get(subject_choice, [])
+topics_text = "\n".join(topics)
+
+with st.sidebar.expander("📋 View / Edit Topics"):
+    edited_topics = st.text_area(
+        "Syllabus topics (one per line):",
+        value=topics_text,
+        height=200,
+        help="You can edit these topics or add new ones. One topic per line.",
+        key="syllabus_topics_editor"
+    )
+    topics_list = [t.strip() for t in edited_topics.split("\n") if t.strip()]
+
+if st.sidebar.button("Check Coverage", use_container_width=True):
+    if topics_list:
+        with st.spinner("AI is analyzing your notes for syllabus topics..."):
+            covered, not_covered, percent = check_syllabus_coverage(topics_list)
+        
+        st.sidebar.markdown("---")
+        st.sidebar.markdown(f"### 📊 Coverage: {percent:.1f}%")
+        st.sidebar.progress(percent / 100)
+        
+        with st.sidebar.expander("✅ Covered Topics"):
+            for t in covered:
+                st.markdown(f"- {t}")
+        
+        with st.sidebar.expander("❌ Not Covered"):
+            for t in not_covered:
+                st.markdown(f"- {t}")
+        
+        if percent < 50:
+            st.sidebar.warning("⚠️ Less than half the syllabus is covered. Consider adding more notes.")
+        elif percent >= 90:
+            st.sidebar.success("🎉 Excellent! Most topics are covered.")
+    else:
+        st.sidebar.warning("No topics to check. Please add some topics.")
 # ---- UI ----
 # Initialize session states
 if "last_question_time" not in st.session_state:
