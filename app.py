@@ -99,21 +99,33 @@ def retrieve(query_text, top_k=10):
     return contexts, sources, pages
 
 def ask_groq(question, contexts, detail="detailed", simple=False, language="English"):
-    """Generate answer with optional style controls."""
-    # Base prompt
-    prompt = f"""You are a Cambridge A-Level tutor. Answer the student's question using ONLY the provided context.
+    if language == "Oʻzbekcha":
+        prompt = f"""Siz Cambridge A-Level o'qituvchisisiz. Talabaning savoliga FAQAT berilgan kontekstdan foydalanib javob bering.
+Agar javob kontekstda bo'lmasa, shunday deb ayting: "Bu ma'lumot mening eslatmalarimda yo'q. Iltimos, darslikka murojaat qiling."
+"""
+        if simple:
+            prompt += "Buni 10 yoshli bolaga tushuntirgandek, juda sodda so'zlar va tushunarli o'xshatishlar bilan tushuntiring.\n"
+        elif detail == "concise":
+            prompt += "Qisqa va aniq javob bering (2-3 jumla).\n"
+        else:
+            prompt += "A-Level talabasi uchun to'liq, batafsil tushuntirish bering. Asosiy ta'riflar, misollar va kontekstdagi bog'liq tushunchalarni qamrab oling. To'liq jumlalar va tuzilgan paragraflardan foydalaning.\n"
+        prompt += f"""
+Kontekst:
+{chr(10).join(contexts)}
+
+Savol: {question}
+Javob:"""
+    else:
+        prompt = f"""You are a Cambridge A-Level tutor. Answer the student's question using ONLY the provided context.
 If the answer is not in the context, say: "I don't have this in my notes. Please check your textbook."
 """
-
-    # Add style instructions
-    if simple:
-        prompt += "Explain this as if the student is a 10‑year‑old. Use very simple words and relatable analogies.\n"
-    elif detail == "concise":
-        prompt += "Be brief and to‑the‑point. Give a short answer in 2‑3 sentences.\n"
-    else:  # detailed
-        prompt += "Provide a comprehensive, detailed explanation suitable for an A‑Level student. Cover key definitions, examples, and related concepts found in the context. Use full sentences and structured paragraphs.\n"
-
-    prompt += f"""
+        if simple:
+            prompt += "Explain this as if the student is a 10‑year‑old. Use very simple words and relatable analogies.\n"
+        elif detail == "concise":
+            prompt += "Be brief and to‑the‑point. Give a short answer in 2‑3 sentences.\n"
+        else:
+            prompt += "Provide a comprehensive, detailed explanation suitable for an A‑Level student. Cover key definitions, examples, and related concepts found in the context. Use full sentences and structured paragraphs.\n"
+        prompt += f"""
 Context:
 {chr(10).join(contexts)}
 
@@ -122,10 +134,10 @@ Answer:"""
 
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     data = {
-        "model": "llama-3.1-8b-instant",   # or "mixtral-8x7b-32768"
+        "model": "llama-3.1-8b-instant",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.2,
-        "max_tokens": 400 if (simple or detail == "concise") else 800
+        "max_tokens": 600 if detail == "detailed" else 400
     }
     try:
         resp = requests.post(GROQ_URL, headers=headers, json=data, timeout=15)
@@ -134,8 +146,7 @@ Answer:"""
         else:
             return "⚠️ Sorry, the AI service is temporarily unavailable."
     except Exception:
-        return "⚠️ Network error. Please try again."
-
+        return "⚠️ Network error."
 
 
 def summarize_topic(question, contexts, language="English"):
