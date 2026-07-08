@@ -98,7 +98,7 @@ def retrieve(query_text, top_k=10):
         pages.append(match["metadata"].get("page", "?"))
     return contexts, sources, pages
 
-def ask_groq(question, contexts, detail="detailed", simple=False):
+def ask_groq(question, contexts, detail="detailed", simple=False, language="English"):
     """Generate answer with optional style controls."""
     # Base prompt
     prompt = f"""You are a Cambridge A-Level tutor. Answer the student's question using ONLY the provided context.
