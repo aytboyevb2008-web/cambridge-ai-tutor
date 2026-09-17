@@ -86,18 +86,39 @@ GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 # ---- FUNCTIONS ----
 def retrieve(query_text, top_k=10):
     query_emb = model.encode(query_text).tolist()
-    results = index.query(vector=query_emb, top_k=top_k, include_metadata=True)
+
+    results = index.query(
+        vector=query_emb,
+        top_k=top_k,
+        include_metadata=True
+    )
+
     contexts, sources, pages = [], [], []
+
     for match in results["matches"]:
-        text = match["metadata"]["text"]
+        score = match.get("score", 0)
+        metadata = match.get("metadata", {})
+
+        text = metadata.get("text", "")
+        source = metadata.get("source", "Unknown")
+        page = metadata.get("page", "?")
+
+        # Temporary debugging: shows retrieval quality in Streamlit logs
+        print(
+            f"[Pinecone] score={score:.4f} | "
+            f"source={source} | page={page}"
+        )
+
         words = text.split()
+
         if len(words) > 300:
             text = " ".join(words[:300]) + "..."
-        contexts.append(text)
-        sources.append(match["metadata"]["source"])
-        pages.append(match["metadata"].get("page", "?"))
-    return contexts, sources, pages
 
+        contexts.append(text)
+        sources.append(source)
+        pages.append(page)
+
+    return contexts, sources, pages
 def ask_groq(question, contexts, detail="detailed", simple=False, language="English"):
     if language == "Oʻzbekcha":
         prompt = f"""Siz Cambridge A-Level o'qituvchisisiz. Talabaning savoliga FAQAT berilgan kontekstdan foydalanib javob bering.
