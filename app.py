@@ -134,7 +134,7 @@ Answer:"""
 
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     data = {
-        "model": "llama-3.1-8b-instant",
+        "model": "openai/gpt-oss-20b",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.2,
         "max_tokens": 600 if detail == "detailed" else 400
@@ -176,7 +176,7 @@ Revision Summary:"""
 
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     data = {
-        "model": "llama-3.1-8b-instant",   # or your preferred model
+        "model": "openai/gpt-oss-20b",   # or your preferred model
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.2,
         "max_tokens": 500
@@ -226,7 +226,7 @@ Is the topic "{topic}" covered in these notes? (Yes/No):"""
 
         headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
         data = {
-            "model": "llama-3.1-8b-instant",
+            "model": "openai/gpt-oss-20b",
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0,
             "max_tokens": 5
