@@ -519,6 +519,9 @@ if question:
         st.session_state.last_contexts = contexts
         st.session_state.question_count += 1
         st.session_state.last_question_time = time.time()
+        st.session_state.last_detail = detail_level
+        st.session_state.last_simple = simple_mode
+        st.session_state.last_language = language
 
     # ---- DISPLAY ANSWER (always run, even if cached) ----
     st.markdown(f'<div class="answer-box">{answer}</div>', unsafe_allow_html=True)
