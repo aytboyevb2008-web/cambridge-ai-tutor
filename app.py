@@ -105,7 +105,9 @@ def retrieve(query_text, top_k=10):
 
         # Temporary debugging: shows retrieval quality in Streamlit logs
         print(
+            f"[Pinecone] query='{query_text}' | "
             f"[Pinecone] score={score:.4f} | "
+            
             f"source={source} | page={page}"
         )
 
