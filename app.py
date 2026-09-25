@@ -214,64 +214,140 @@ Revision Summary:"""
         return "⚠️ Network error."
 
 def check_syllabus_coverage(topics, contexts_cache=None):
-    """Use the LLM to check whether each topic is covered by the notes.
-    Returns covered list, not_covered list, and percentage.
     """
+    Check each syllabus topic against notes retrieved specifically
+    for that topic.
+    """
+
     covered = []
     not_covered = []
+
     total = len(topics)
+
     if total == 0:
         return covered, not_covered, 0
 
-    # If we don't have a pre-retrieved context for all notes, we'll get a sample of chunks
-    if contexts_cache is None:
-        # Retrieve a broad set of chunks (up to 50) to represent the whole knowledge base
-        # We'll use a dummy query to get diverse chunks
-        sample_emb = model.encode("Cambridge A-Level syllabus").tolist()
-        results = index.query(vector=sample_emb, top_k=50, include_metadata=True)
-        contexts_cache = [m["metadata"]["text"] for m in results["matches"]]
-
     progress_bar = st.progress(0)
+
     for i, topic in enumerate(topics):
+
         topic = topic.strip()
+
         if not topic:
             continue
 
-        # Ask the LLM: is this topic covered?
-        prompt = f"""You are an assistant that checks if a specific syllabus topic is present in a collection of study notes.
-Read the notes and answer only "Yes" if the topic is clearly explained or discussed, otherwise answer "No".
-Topic: {topic}
+        # Retrieve notes specifically relevant to this topic
+        contexts, _, _ = retrieve(
+            topic,
+            top_k=5
+        )
 
-Notes (excerpts):
-{chr(10).join(contexts_cache[:10])}  # limit to 10 chunks to save tokens
+        if not contexts:
+            not_covered.append(topic)
 
-Is the topic "{topic}" covered in these notes? (Yes/No):"""
+            progress_bar.progress(
+                (i + 1) / total
+            )
 
-        headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+            continue
+
+        context_text = "\n\n".join(
+            contexts
+        )
+
+        prompt = f"""
+You are checking whether a Cambridge A-Level syllabus topic
+is covered in a collection of study notes.
+
+Topic:
+{topic}
+
+Retrieved notes:
+{context_text}
+
+Answer ONLY:
+
+Yes
+
+if the retrieved notes clearly explain or discuss this topic.
+
+Otherwise answer ONLY:
+
+No
+"""
+
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        }
+
         data = {
             "model": "openai/gpt-oss-20b",
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
             "temperature": 0,
             "max_tokens": 5
         }
+
         try:
-            resp = requests.post(GROQ_URL, headers=headers, json=data, timeout=15)
+
+            resp = requests.post(
+                GROQ_URL,
+                headers=headers,
+                json=data,
+                timeout=30
+            )
+
             if resp.status_code == 200:
-                answer = resp.json()["choices"][0]["message"]["content"].strip().lower()
+
+                answer = (
+                    resp.json()["choices"][0]
+                    ["message"]["content"]
+                    .strip()
+                    .lower()
+                )
+
                 if answer.startswith("yes"):
                     covered.append(topic)
                 else:
                     not_covered.append(topic)
+
             else:
+                print(
+                    f"Coverage Groq error "
+                    f"{resp.status_code}: "
+                    f"{resp.text[:300]}"
+                )
+
                 not_covered.append(topic)
-        except Exception:
+
+        except Exception as e:
+
+            print(
+                f"Coverage error for "
+                f"'{topic}': {e}"
+            )
+
             not_covered.append(topic)
 
-        progress_bar.progress((i + 1) / total)
-        time.sleep(0.5)  # small delay to avoid rate limits
+        progress_bar.progress(
+            (i + 1) / total
+        )
+
+        time.sleep(0.5)
 
     progress_bar.empty()
-    percent = (len(covered) / total * 100) if total else 0
+
+    percent = (
+        len(covered) / total * 100
+        if total
+        else 0
+    )
+
     return covered, not_covered, percent
 
 # ---- SIDEBAR: Syllabus Coverage Tracker ----
