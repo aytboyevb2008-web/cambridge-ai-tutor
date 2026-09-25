@@ -626,18 +626,18 @@ if question:
     st.markdown(f'<div class="answer-box">{answer}</div>', unsafe_allow_html=True)
 
     with st.expander("🔎 Retrieved Evidence"):
-    for i, (context, source, page) in enumerate(
-        zip(
-            st.session_state.last_contexts,
-            st.session_state.last_sources,
-            st.session_state.last_pages
-        ),
-        start=1
-    ):
-        st.markdown(f"### Match {i}")
-        st.caption(f"{source} — page {page}")
-        st.write(context)
-        st.markdown("---")
+        for i, (context, source, page) in enumerate(
+            zip(
+                st.session_state.last_contexts,
+                st.session_state.last_sources,
+                st.session_state.last_pages
+            ),
+            start=1
+        ):
+            st.markdown(f"### Match {i}")
+            st.caption(f"{source} — page {page}")
+            st.write(context)
+            st.markdown("---")
                    
                 # ---- TEXT-TO-SPEECH (manual voice selector, pause) ----
         encoded = base64.b64encode(answer.encode()).decode()
