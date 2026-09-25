@@ -212,7 +212,211 @@ Revision Summary:"""
             return "⚠️ Could not generate summary. Please try again."
     except Exception:
         return "⚠️ Network error."
+def generate_quiz_question(topic, contexts, language="English"):
+    """Generate one practice question using only retrieved notes."""
 
+    if not contexts:
+        if language == "Oʻzbekcha":
+            return "Bu mavzu bo'yicha eslatmalarda yetarli ma'lumot topilmadi."
+        return "I couldn't find enough information about this topic in the notes."
+
+    context_text = "\n\n".join(contexts[:6])
+
+    if language == "Oʻzbekcha":
+        prompt = f"""
+Siz Cambridge A-Level Computer Science o'qituvchisisiz.
+
+FAQAT quyidagi eslatmalardan foydalanib,
+"{topic}" mavzusi bo'yicha bitta mashq savoli yarating.
+
+Qoidalar:
+- Savol A-Level talabasi uchun mos bo'lsin.
+- Savol 4 ballik bo'lsin.
+- Javobni bermang.
+- Eslatmalarda bo'lmagan ma'lumotni qo'shmang.
+- Faqat savolni yozing.
+- Savol oxirida [4 marks] deb yozing.
+
+Eslatmalar:
+{context_text}
+"""
+    else:
+        prompt = f"""
+You are a Cambridge A-Level Computer Science tutor.
+
+Using ONLY the notes below, create ONE practice question
+about the topic "{topic}".
+
+Rules:
+- Make it suitable for an A-Level student.
+- Make it worth 4 practice marks.
+- Do NOT give the answer.
+- Do not introduce information that is not in the notes.
+- Output only the question.
+- End the question with [4 marks].
+
+Notes:
+{context_text}
+"""
+
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "model": "openai/gpt-oss-20b",
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "temperature": 0.4,
+        "max_tokens": 250
+    }
+
+    try:
+        resp = requests.post(
+            GROQ_URL,
+            headers=headers,
+            json=data,
+            timeout=20
+        )
+
+        if resp.status_code == 200:
+            return resp.json()["choices"][0]["message"]["content"].strip()
+
+        print(
+            f"Quiz generation error {resp.status_code}: "
+            f"{resp.text[:300]}"
+        )
+
+        return "⚠️ Could not generate a quiz question."
+
+    except Exception as e:
+        print(f"Quiz generation exception: {e}")
+        return "⚠️ Network error."
+
+
+def mark_quiz_answer(
+    quiz_question,
+    student_answer,
+    contexts,
+    language="English"
+):
+    """
+    Give practice feedback using only retrieved notes.
+    This is not an official Cambridge mark scheme.
+    """
+
+    if not contexts:
+        return "There is not enough retrieved material to mark this answer."
+
+    context_text = "\n\n".join(contexts[:6])
+
+    if language == "Oʻzbekcha":
+        prompt = f"""
+Siz Cambridge A-Level Computer Science o'qituvchisisiz.
+
+Quyidagi savolga berilgan talaba javobini
+FAQAT taqdim etilgan eslatmalar asosida baholang.
+
+Bu rasmiy Cambridge mark scheme emas.
+Bu faqat mashq uchun baholash.
+
+Savol:
+{quiz_question}
+
+Talabaning javobi:
+{student_answer}
+
+Eslatmalar:
+{context_text}
+
+Quyidagi formatda javob bering:
+
+### Mashq bali: X/4
+
+### To'g'ri tomonlari
+- ...
+
+### Yetishmayotgan yoki yaxshilanishi kerak bo'lgan joylar
+- ...
+
+### Yaxshiroq javob namunasi
+...
+"""
+    else:
+        prompt = f"""
+You are a Cambridge A-Level Computer Science tutor.
+
+Evaluate the student's answer using ONLY the supplied notes.
+
+This is NOT an official Cambridge mark scheme.
+The score is only a practice score based on the retrieved material.
+
+Question:
+{quiz_question}
+
+Student answer:
+{student_answer}
+
+Retrieved notes:
+{context_text}
+
+Respond using exactly this structure:
+
+### Practice score: X/4
+
+### What you got right
+- ...
+
+### What is missing or could be improved
+- ...
+
+### Better model answer
+...
+"""
+
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "model": "openai/gpt-oss-20b",
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "temperature": 0.1,
+        "max_tokens": 650
+    }
+
+    try:
+        resp = requests.post(
+            GROQ_URL,
+            headers=headers,
+            json=data,
+            timeout=20
+        )
+
+        if resp.status_code == 200:
+            return resp.json()["choices"][0]["message"]["content"].strip()
+
+        print(
+            f"Quiz marking error {resp.status_code}: "
+            f"{resp.text[:300]}"
+        )
+
+        return "⚠️ Could not mark the answer."
+
+    except Exception as e:
+        print(f"Quiz marking exception: {e}")
+        return "⚠️ Network error."
 def check_syllabus_coverage(topics, contexts_cache=None):
     """
     Check each syllabus topic against notes retrieved specifically
@@ -501,6 +705,24 @@ if "last_pages" not in st.session_state:
     st.session_state.last_pages = []
 if "last_contexts" not in st.session_state:
     st.session_state.last_contexts = []
+# ---- QUIZ SESSION STATE ----
+if "quiz_question" not in st.session_state:
+    st.session_state.quiz_question = ""
+
+if "quiz_contexts" not in st.session_state:
+    st.session_state.quiz_contexts = []
+
+if "quiz_sources" not in st.session_state:
+    st.session_state.quiz_sources = []
+
+if "quiz_pages" not in st.session_state:
+    st.session_state.quiz_pages = []
+
+if "quiz_feedback" not in st.session_state:
+    st.session_state.quiz_feedback = ""
+
+if "quiz_topic" not in st.session_state:
+    st.session_state.quiz_topic = ""
 COOLDOWN_SECONDS = 15
 
 # Styled headers
@@ -520,10 +742,155 @@ language = st.selectbox(
     index=0,
     help="Choose the language for answers."
 )
+st.markdown("### 🎯 Study Mode")
+
+study_mode = st.radio(
+    "Choose how you want to study:",
+    options=["Tutor", "Quiz"],
+    horizontal=True,
+    label_visibility="collapsed"
+)
 # Streak display
 if st.session_state.question_count > 0:
     st.markdown(f'<span class="streak-badge">🔥 {st.session_state.question_count} questions answered this session</span>', unsafe_allow_html=True)
+# =========================================================
+# QUIZ MODE
+# =========================================================
+if study_mode == "Quiz":
 
+    st.markdown("## 🧠 Quiz Mode")
+
+    st.caption(
+        "Choose a topic. The tutor will generate one practice "
+        "question using your retrieved Cambridge notes."
+    )
+
+    quiz_topic_input = st.text_input(
+        "Topic:",
+        placeholder="e.g. Virtual memory, Databases, Processor fundamentals",
+        key="quiz_topic_input"
+    )
+
+    if st.button(
+        "🎲 Generate Practice Question",
+        use_container_width=True
+    ):
+
+        if not quiz_topic_input.strip():
+
+            st.warning("Enter a topic first.")
+
+        else:
+
+            with st.spinner("Searching your notes..."):
+
+                quiz_contexts, quiz_sources, quiz_pages = retrieve(
+                    quiz_topic_input.strip(),
+                    top_k=6
+                )
+
+            with st.spinner("Creating a practice question..."):
+
+                quiz_question = generate_quiz_question(
+                    quiz_topic_input.strip(),
+                    quiz_contexts,
+                    language=language
+                )
+
+            st.session_state.quiz_topic = quiz_topic_input.strip()
+            st.session_state.quiz_question = quiz_question
+            st.session_state.quiz_contexts = quiz_contexts
+            st.session_state.quiz_sources = quiz_sources
+            st.session_state.quiz_pages = quiz_pages
+            st.session_state.quiz_feedback = ""
+
+    # Show generated question
+    if st.session_state.quiz_question:
+
+        st.markdown("### ❓ Question")
+
+        st.markdown(
+            f"""
+            <div class="answer-box">
+            {st.session_state.quiz_question}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        student_answer = st.text_area(
+            "Your answer:",
+            height=170,
+            key="quiz_student_answer"
+        )
+
+        if st.button(
+            "✅ Submit Answer",
+            use_container_width=True
+        ):
+
+            if not student_answer.strip():
+
+                st.warning("Write your answer first.")
+
+            else:
+
+                with st.spinner("Checking your answer..."):
+
+                    feedback = mark_quiz_answer(
+                        st.session_state.quiz_question,
+                        student_answer.strip(),
+                        st.session_state.quiz_contexts,
+                        language=language
+                    )
+
+                st.session_state.quiz_feedback = feedback
+
+        # Feedback
+        if st.session_state.quiz_feedback:
+
+            st.markdown("## 📊 Feedback")
+
+            st.markdown(
+                st.session_state.quiz_feedback
+            )
+
+        # Sources used for quiz
+        if st.session_state.quiz_sources:
+
+            with st.expander("📚 Quiz Sources"):
+
+                for source, page in zip(
+                    st.session_state.quiz_sources,
+                    st.session_state.quiz_pages
+                ):
+
+                    st.write(
+                        f"- {source} (page {page})"
+                    )
+
+        # Retrieved evidence
+        if st.session_state.quiz_contexts:
+
+            with st.expander("🔎 Quiz Retrieved Evidence"):
+
+                for i, (context, source, page) in enumerate(
+                    zip(
+                        st.session_state.quiz_contexts,
+                        st.session_state.quiz_sources,
+                        st.session_state.quiz_pages
+                    ),
+                    start=1
+                ):
+
+                    st.markdown(f"### Match {i}")
+                    st.caption(f"{source} — page {page}")
+                    st.write(context)
+
+                    st.markdown("---")
+
+    # Prevent the normal Tutor UI below from running
+    st.stop()
 question = st.text_input("Your question:")
 # ---- SIDEBAR: Past Paper Search ----
 # ---- SIDEBAR: Past Paper Search ----
